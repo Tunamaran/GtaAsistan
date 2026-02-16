@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QLineEdit, QComboBox, QPushButton,
     QScrollArea, QStackedWidget, QCheckBox, QApplication,
     QFormLayout, QSpinBox, QFileDialog, QMessageBox,
-    QRubberBand, QLayout, QSizePolicy, QGroupBox
+    QRubberBand, QLayout, QSizePolicy, QGroupBox, QMenu, QAction
 )
 # PyQt5 - Core
 from PyQt5.QtCore import (
@@ -19,8 +19,95 @@ from PyQt5.QtGui import (
 
 # Proje Modülleri
 from config import load_config, save_config
-from database import get_smart_badges, get_vehicle_advice, parse_number, load_garage, get_garage_stats
+from database import get_smart_badges, get_vehicle_advice, parse_number, load_garage, get_garage_stats, toggle_vehicle_ownership
 from workers import ImageLoaderThread
+
+# ==========================================
+# THEME & DESIGN SYSTEM
+# ==========================================
+class Theme:
+    """Uygulama renk paleti ve stil sabitleri"""
+    # Renkler
+    PRIMARY = "#00FF96"
+    PRIMARY_DARK = "#00b894"
+    BACKGROUND = "#121212"
+    SURFACE = "#2d3436"
+    SURFACE_LIGHT = "#3d4d56"
+    ERROR = "#d63031"
+    ERROR_LIGHT = "#ff7675"
+    WARNING = "#fdcb6e"
+    SUCCESS = "#00b894"
+    
+    # Metin Renkleri (WCAG AA uyumlu)
+    TEXT_PRIMARY = "#FFFFFF"
+    TEXT_SECONDARY = "#B2BEC3"  # 8.5:1 contrast
+    TEXT_DISABLED = "#7F8C8D"   # 4.1:1 contrast
+    TEXT_HINT = "#636e72"
+    
+    # Border & Shadow
+    BORDER_COLOR = "#444444"
+    BORDER_HOVER = "#00FF96"
+    SHADOW = "rgba(0, 0, 0, 0.3)"
+    
+    # Border Radius
+    RADIUS_SMALL = 4
+    RADIUS_MEDIUM = 6
+    RADIUS_LARGE = 12
+    
+    # Opacity
+    OPACITY_DISABLED = 0.5
+    OPACITY_HOVER = 0.8
+
+class Layout:
+    """Layout boyut sabitleri"""
+    # Card boyutları
+    CARD_WIDTH = 290
+    CARD_HEIGHT = 320
+    CARD_IMAGE_WIDTH = 260
+    CARD_IMAGE_HEIGHT = 145
+    
+    # Spacing
+    SPACING_TINY = 5
+    SPACING_SMALL = 10
+    SPACING_MEDIUM = 15
+    SPACING_LARGE = 25
+    SPACING_XLARGE = 40
+    
+    # Margins
+    MARGIN_WINDOW = 10
+    MARGIN_CONTENT = 25
+    
+    # HUD
+    HUD_MIN_WIDTH = 220
+    HUD_MAX_HEIGHT = 32
+    
+    # Button
+    BUTTON_HEIGHT = 40
+    BUTTON_MIN_WIDTH = 120
+
+class Typography:
+    """Tipografi sistemi"""
+    # Font Aileleri
+    FONT_FAMILY = "Segoe UI"
+    
+    # Font Boyutları (pt)
+    SIZE_HUGE = 24
+    SIZE_XLARGE = 18
+    SIZE_LARGE = 16
+    SIZE_TITLE = 14
+    SIZE_BODY = 11
+    SIZE_SMALL = 10
+    SIZE_TINY = 9
+    SIZE_CAPTION = 8
+    
+    # Font Ağırlıkları
+    WEIGHT_NORMAL = QFont.Normal
+    WEIGHT_BOLD = QFont.Bold
+    
+    @staticmethod
+    def get(size, weight=QFont.Normal):
+        """Font nesnesi döndür"""
+        return QFont(Typography.FONT_FAMILY, size, weight)
 
 
 
@@ -233,8 +320,7 @@ class VehicleCard(QFrame):
         v_class = vehicle_data.get("Vehicle Class", "")
 
         
-
-        self.name_label = QLabel(f"<center><span style='color: #00FF96; font-size: 13pt; font-weight: bold;'>{name}</span><br><span style='color: #AAAAAA; font-size: 10pt;'>{v_class}</span></center>")
+        self.name_label = QLabel(f"<center><span style='color: {Theme.PRIMARY}; font-size: 13pt; font-weight: bold;'>{name}</span><br><span style='color: {Theme.TEXT_SECONDARY}; font-size: 10pt;'>{v_class}</span></center>")
 
         self.name_label.setStyleSheet("border: none; background: transparent;")
 
@@ -271,16 +357,59 @@ class VehicleCard(QFrame):
 
 
     def set_image(self, pixmap):
-
-        try: self.img_label.setPixmap(pixmap.scaled(260, 145, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-
-        except RuntimeError: pass
-
-
+        try: 
+            self.img_label.setPixmap(pixmap.scaled(Layout.CARD_IMAGE_WIDTH, Layout.CARD_IMAGE_HEIGHT, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        except RuntimeError: 
+            pass
 
     def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton: 
+            self.clicked.emit(self.vehicle_data)
 
-        if event.button() == Qt.LeftButton: self.clicked.emit(self.vehicle_data)
+    def contextMenuEvent(self, event):
+        """Sağ tık menüsü - hızlı aksiyonlar"""
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{ 
+                background: {Theme.SURFACE}; 
+                color: {Theme.TEXT_PRIMARY}; 
+                padding: {Layout.SPACING_TINY}px; 
+                border: 1px solid {Theme.BORDER_COLOR};
+                border-radius: {Theme.RADIUS_SMALL}px;
+            }}
+            QMenu::item {{ 
+                padding: {Layout.SPACING_SMALL}px {Layout.SPACING_LARGE}px; 
+            }}
+            QMenu::item:selected {{ 
+                background: {Theme.PRIMARY}; 
+                color: black; 
+            }}
+        """)
+        
+        name = self.vehicle_data.get("Vehicle Name", "")
+        garage = load_garage()
+        is_owned = name in garage
+        
+        # Garaj aksiyonu
+        action_garage = QAction("✅ Garajdan Çıkar" if is_owned else "➕ Garaja Ekle", self)
+        action_garage.triggered.connect(lambda: self._toggle_garage(name))
+        menu.addAction(action_garage)
+        
+        menu.addSeparator()
+        
+        # Detay aksiyonu
+        action_detail = QAction("🔍 Detayları Gör", self)
+        action_detail.triggered.connect(lambda: self.clicked.emit(self.vehicle_data))
+        menu.addAction(action_detail)
+        
+        menu.exec_(event.globalPos())
+    
+    def _toggle_garage(self, vehicle_name):
+        """Garaj toggle ve UI güncelleme"""
+        toggle_vehicle_ownership(vehicle_name)
+        # Badge'leri güncelle
+        badges = get_smart_badges(self.vehicle_data)
+        # Not: Parent window refresh gerekebilir
 
 
 
@@ -432,13 +561,23 @@ class GalleryWindow(QWidget):
         self.setup_history_page()
 
         
-
         # YENİ: Başlangıç ayarları
         self.settings_window = SettingsWindow()
         self.settings_window.hide()
         
+        # Pagination başlangıç değerleri
+        self.total_pages = 1
+        
+        # Tab Order Tanımla (Klavye navigasyonu için)
+        self.setTabOrder(self.search_box, self.sort_box)
+        self.setTabOrder(self.sort_box, self.class_box)
+        self.setTabOrder(self.class_box, self.brand_box)
+        self.setTabOrder(self.brand_box, self.vendor_box)
+        self.setTabOrder(self.vendor_box, self.mod_box)
+        self.setTabOrder(self.mod_box, self.armor_check)
+        self.setTabOrder(self.armor_check, self.weapon_check)
+        
         self.update_tab_buttons()
-
         self.apply_filters() 
 
     def mousePressEvent(self, event):
@@ -625,37 +764,35 @@ class GalleryWindow(QWidget):
         
 
         top_bar_1 = QHBoxLayout()
-
         top_bar_1.setSpacing(15)
 
         self.search_box = QLineEdit()
-
         self.search_box.setPlaceholderText("Araç Ara (Örn: Zentorno, T20)...")
-
+        self.search_box.setToolTip("Araç ismi veya markasına göre arama yapın")
+        self.search_box.setAccessibleName("Araç Arama Kutusu")
         self.search_box.textChanged.connect(self.apply_filters)
-
         top_bar_1.addWidget(self.search_box, stretch=2)
 
         self.sort_box = QComboBox()
-
         self.sort_box.addItems(["Sıralama: Varsayılan", "Fiyat: Önce En Pahalı", "Fiyat: Önce En Ucuz", "Hız: En Hızlılar", "İvme: En Yüksek Kalkış"])
-
+        self.sort_box.setToolTip("Araçları farklı kriterlere göre sıralayın")
+        self.sort_box.setAccessibleName("Sıralama Seçenekleri")
         self.sort_box.currentTextChanged.connect(self.apply_filters)
-
         top_bar_1.addWidget(self.sort_box, stretch=1)
 
         close_btn = QPushButton("KAPAT (F11)")
-
         close_btn.setCursor(QCursor(Qt.PointingHandCursor))
-
+        close_btn.setToolTip("Galeriyi kapat (F11)")
+        close_btn.setAccessibleName("Galeriyi Kapat")
         close_btn.setStyleSheet("background: #d63031; color: white; padding: 10px 20px; border-radius: 6px; font-weight:bold; font-size: 11pt;")
-
         close_btn.clicked.connect(self.hide)
-
         top_bar_1.addWidget(close_btn)
 
         settings_btn = QPushButton("⚙️ AYARLAR")
         settings_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        settings_btn.setToolTip("Uygulama ayarlarını aç")
+        settings_btn.setAccessibleName("Ayarlar Menüsü")
+        settings_btn.setAccessibleDescription("OCR bölgesi, kısayol tuşları ve diğer ayarları değiştirin")
         settings_btn.setStyleSheet("background: #636e72; color: white; padding: 10px 20px; border-radius: 6px; font-weight:bold; font-size: 11pt;")
         settings_btn.clicked.connect(self.open_settings)
         top_bar_1.addWidget(settings_btn)
@@ -663,62 +800,76 @@ class GalleryWindow(QWidget):
         layout.addLayout(top_bar_1)
 
         
-
         top_bar_2 = QHBoxLayout()
-
         top_bar_2.setSpacing(15)
 
         self.class_box = QComboBox()
-
         self.class_box.addItem("Tüm Sınıflar")
-
         self.class_box.addItems(self.all_classes)
-
+        self.class_box.setToolTip("Araçları sınıfına göre filtrele (Sports, Super, SUV vb.)")
+        self.class_box.setAccessibleName("Araç Sınıfı Filtresi")
         self.class_box.currentTextChanged.connect(self.apply_filters)
-
         top_bar_2.addWidget(self.class_box)
 
         self.brand_box = QComboBox()
-
         self.brand_box.addItem("Tüm Markalar")
-
         self.brand_box.addItems(self.all_manufacturers)
-
+        self.brand_box.setToolTip("Araçları markasına göre filtrele")
+        self.brand_box.setAccessibleName("Marka Filtresi")
         self.brand_box.currentTextChanged.connect(self.apply_filters)
-
         top_bar_2.addWidget(self.brand_box)
 
         self.vendor_box = QComboBox()
-
         self.vendor_box.addItem("Tüm Satıcılar")
-
         self.vendor_box.addItems(self.all_vendors)
+        self.vendor_box.setToolTip("Araçları satıcısına göre filtrele")
+        self.vendor_box.setAccessibleName("Satıcı Filtresi")
         self.vendor_box.currentTextChanged.connect(self.apply_filters)
-
         top_bar_2.addWidget(self.vendor_box)
 
         # YENİ: Modifikasyon Filtresi
         self.mod_box = QComboBox()
         self.mod_box.addItem("Tüm Atölyeler")
         self.mod_box.addItems(self.all_mods)
+        self.mod_box.setToolTip("Araçları modifikasyon atölyesine göre filtrele")
+        self.mod_box.setAccessibleName("Atölye Filtresi")
         self.mod_box.currentTextChanged.connect(self.apply_filters)
         top_bar_2.addWidget(self.mod_box)
 
         self.armor_check = QCheckBox("Sadece Zırhlı")
-
         self.armor_check.setCursor(QCursor(Qt.PointingHandCursor))
-
+        self.armor_check.setToolTip("Sadece zırh özelliği olan araçları göster")
+        self.armor_check.setAccessibleName("Zırh Filtresi")
         self.armor_check.stateChanged.connect(self.apply_filters)
-
         top_bar_2.addWidget(self.armor_check)
 
         self.weapon_check = QCheckBox("Sadece Silahlı")
-
         self.weapon_check.setCursor(QCursor(Qt.PointingHandCursor))
-
+        self.weapon_check.setToolTip("Sadece silah özelliği olan araçları göster")
+        self.weapon_check.setAccessibleName("Silah Filtresi")
         self.weapon_check.stateChanged.connect(self.apply_filters)
-
         top_bar_2.addWidget(self.weapon_check)
+
+        # Filtre Temizleme Butonu
+        clear_filters_btn = QPushButton("🔄 Filtreleri Temizle")
+        clear_filters_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        clear_filters_btn.setToolTip("Tüm filtreleri varsayılan değerlere döndür")
+        clear_filters_btn.setAccessibleName("Filtreleri Temizle")
+        clear_filters_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Theme.WARNING};
+                color: black;
+                padding: 8px 15px;
+                border-radius: {Theme.RADIUS_SMALL}px;
+                font-weight: bold;
+                font-size: 10pt;
+            }}
+            QPushButton:hover {{
+                background: {Theme.PRIMARY};
+            }}
+        """)
+        clear_filters_btn.clicked.connect(self.clear_filters)
+        top_bar_2.addWidget(clear_filters_btn)
 
         layout.addLayout(top_bar_2)
 
@@ -748,32 +899,68 @@ class GalleryWindow(QWidget):
 
         bottom_bar = QHBoxLayout()
 
+        # Pagination Controls
         self.prev_btn = QPushButton("<< ÖNCEKİ SAYFA")
-
         self.prev_btn.setCursor(QCursor(Qt.PointingHandCursor))
-
+        self.prev_btn.setToolTip("Önceki sayfaya git")
+        self.prev_btn.setAccessibleName("Önceki Sayfa")
         self.prev_btn.setStyleSheet("background: #2b2b2b; color: white; padding: 10px 20px; border-radius: 6px; font-weight:bold; font-size: 11pt;")
-
         self.prev_btn.clicked.connect(lambda: self.change_page(-1))
-
         bottom_bar.addWidget(self.prev_btn)
 
+        # İlk Sayfa Butonu
+        self.first_page_btn = QPushButton("|◀ İLK")
+        self.first_page_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self.first_page_btn.setToolTip("İlk sayfaya git")
+        self.first_page_btn.setAccessibleName("İlk Sayfa")
+        self.first_page_btn.setStyleSheet("background: #2b2b2b; color: white; padding: 10px 15px; border-radius: 6px; font-weight:bold; font-size: 10pt;")
+        self.first_page_btn.clicked.connect(lambda: self.go_to_page(0))
+        bottom_bar.addWidget(self.first_page_btn)
+
         self.page_label = QLabel("Sayfa 1 / 1")
-
         self.page_label.setStyleSheet("color: #00FF96; font-weight: bold; font-size: 14pt;")
-
         self.page_label.setAlignment(Qt.AlignCenter)
-
         bottom_bar.addWidget(self.page_label)
 
+        # Sayfa Numarası Input
+        page_input_layout = QHBoxLayout()
+        page_input_label = QLabel("Sayfa:")
+        page_input_label.setStyleSheet("color: white; font-size: 10pt;")
+        self.page_input = QSpinBox()
+        self.page_input.setMinimum(1)
+        self.page_input.setMaximum(1)
+        self.page_input.setToolTip("Belirli bir sayfaya git")
+        self.page_input.setAccessibleName("Sayfa Numarası")
+        self.page_input.setStyleSheet("""
+            QSpinBox {
+                background: #2b2b2b;
+                color: white;
+                padding: 5px;
+                border: 1px solid #444;
+                border-radius: 4px;
+                font-size: 10pt;
+            }
+        """)
+        self.page_input.valueChanged.connect(lambda val: self.go_to_page(val - 1))
+        page_input_layout.addWidget(page_input_label)
+        page_input_layout.addWidget(self.page_input)
+        bottom_bar.addLayout(page_input_layout)
+
+        # Son Sayfa Butonu
+        self.last_page_btn = QPushButton("SON ▶|")
+        self.last_page_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self.last_page_btn.setToolTip("Son sayfaya git")
+        self.last_page_btn.setAccessibleName("Son Sayfa")
+        self.last_page_btn.setStyleSheet("background: #2b2b2b; color: white; padding: 10px 15px; border-radius: 6px; font-weight:bold; font-size: 10pt;")
+        self.last_page_btn.clicked.connect(lambda: self.go_to_page(self.total_pages - 1))
+        bottom_bar.addWidget(self.last_page_btn)
+
         self.next_btn = QPushButton("SONRAKİ SAYFA >>")
-
         self.next_btn.setCursor(QCursor(Qt.PointingHandCursor))
-
+        self.next_btn.setToolTip("Sonraki sayfaya git")
+        self.next_btn.setAccessibleName("Sonraki Sayfa")
         self.next_btn.setStyleSheet("background: #00FF96; color: black; padding: 10px 20px; border-radius: 6px; font-weight:bold; font-size: 11pt;")
-
         self.next_btn.clicked.connect(lambda: self.change_page(1))
-
         bottom_bar.addWidget(self.next_btn)
 
         layout.addLayout(bottom_bar)
@@ -924,27 +1111,36 @@ class GalleryWindow(QWidget):
 
 
     def load_page(self):
-
         self.threads = [t for t in self.threads if t.isRunning()]
 
         for i in reversed(range(self.grid_layout.count())): 
-
             w = self.grid_layout.itemAt(i).widget()
-
             if w: w.deleteLater()
 
-        total_pages = max(1, (len(self.filtered_data) + self.items_per_page - 1) // self.items_per_page)
+        self.total_pages = max(1, (len(self.filtered_data) + self.items_per_page - 1) // self.items_per_page)
+        
+        # Sayfa limitlerini kontrol et
+        if self.current_page >= self.total_pages:
+            self.current_page = self.total_pages - 1
+        if self.current_page < 0:
+            self.current_page = 0
 
-        self.page_label.setText(f"Sayfa {self.current_page + 1} / {total_pages}")
+        self.page_label.setText(f"Sayfa {self.current_page + 1} / {self.total_pages}")
 
+        # Butonları enable/disable
         self.prev_btn.setEnabled(self.current_page > 0)
-
-        self.next_btn.setEnabled(self.current_page < total_pages - 1)
+        self.first_page_btn.setEnabled(self.current_page > 0)
+        self.next_btn.setEnabled(self.current_page < self.total_pages - 1)
+        self.last_page_btn.setEnabled(self.current_page < self.total_pages - 1)
+        
+        # Sayfa input'u güncelle
+        self.page_input.setMaximum(self.total_pages)
+        self.page_input.blockSignals(True)  # Sonsuz loop önleme
+        self.page_input.setValue(self.current_page + 1)
+        self.page_input.blockSignals(False)
 
         start_idx = self.current_page * self.items_per_page
-
         end_idx = start_idx + self.items_per_page
-
         page_items = self.filtered_data[start_idx:end_idx]
 
         # Dinamik Sütun Hesaplama
@@ -958,35 +1154,24 @@ class GalleryWindow(QWidget):
         row, col = 0, 0
 
         for car in page_items:
-
             card = VehicleCard(car)
-
             card.clicked.connect(self.show_detail)
-
             self.grid_layout.addWidget(card, row, col)
 
             url = car.get("Image URL", "")
 
             if url in self.image_cache:
-
                 card.set_image(self.image_cache[url])
 
             elif url and url != "Resim Bulunamadı":
-
                 thread = ImageLoaderThread(url)
-
                 thread.image_loaded_signal.connect(lambda u, p, c=card: self.cache_and_set(u, p, c))
-
                 self.threads.append(thread)
-
                 thread.start()
 
             col += 1
-
             if col >= cols: 
-
                 col = 0
-
                 row += 1
 
 
@@ -1003,10 +1188,46 @@ class GalleryWindow(QWidget):
 
 
     def change_page(self, delta):
-
         self.current_page += delta
-
         self.load_page()
+
+    def go_to_page(self, page_num):
+        """Belirli bir sayfaya git"""
+        if 0 <= page_num < self.total_pages:
+            self.current_page = page_num
+            self.load_page()
+
+    def clear_filters(self):
+        """Tüm filtreleri varsayılan değerlere döndür"""
+        self.search_box.clear()
+        self.sort_box.setCurrentIndex(0)
+        self.class_box.setCurrentIndex(0)
+        self.brand_box.setCurrentIndex(0)
+        self.vendor_box.setCurrentIndex(0)
+        self.mod_box.setCurrentIndex(0)
+        self.armor_check.setChecked(False)
+        self.weapon_check.setChecked(False)
+        self.apply_filters()
+
+    def keyPressEvent(self, event):
+        """Klavye navigasyonu desteği"""
+        if event.key() == Qt.Key_Escape:
+            self.hide()
+        elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            # Enter ile arama kutusundan filtre uygula
+            focused = QApplication.focusWidget()
+            if focused == self.search_box:
+                self.apply_filters()
+        elif event.key() == Qt.Key_Left:
+            # Sol ok - önceki sayfa
+            if self.current_page > 0:
+                self.change_page(-1)
+        elif event.key() == Qt.Key_Right:
+            # Sağ ok - sonraki sayfa
+            if self.current_page < self.total_pages - 1:
+                self.change_page(1)
+        else:
+            super().keyPressEvent(event)
 
 
 
@@ -1062,7 +1283,7 @@ class GalleryWindow(QWidget):
 
                 lbl_title.setFont(QFont("Segoe UI", 12, QFont.Bold)) 
 
-                lbl_title.setStyleSheet("color: #AAAAAA; padding: 5px;")
+                lbl_title.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; padding: 5px;")
 
                 lbl_value = QLabel(str(value))
 
@@ -1143,7 +1364,7 @@ class GalleryWindow(QWidget):
             stats.append(("⚡ En Hızlı", fastest.get("Vehicle Name", ""), "#74b9ff"))
 
         for i, (label_text, value_text, color) in enumerate(stats):
-            lbl = QLabel(f"<span style='color: #AAAAAA; font-size: 10pt;'>{label_text}</span><br>"
+            lbl = QLabel(f"<span style='color: {Theme.TEXT_SECONDARY}; font-size: 10pt;'>{label_text}</span><br>"
                          f"<span style='color: {color}; font-size: 14pt; font-weight: bold;'>{value_text}</span>")
             lbl.setAlignment(Qt.AlignCenter)
             summary_layout.addWidget(lbl, 0, i)
@@ -1315,7 +1536,7 @@ class GalleryWindow(QWidget):
             if v_class:
                 class_lbl = QLabel(v_class)
                 class_lbl.setFont(QFont("Segoe UI", 9))
-                class_lbl.setStyleSheet("color: #AAAAAA;")
+                class_lbl.setStyleSheet(f"color: {Theme.TEXT_SECONDARY};")
                 row_layout.addWidget(class_lbl)
 
             # Fiyat
@@ -1591,7 +1812,7 @@ class OverlayHUD(QWidget):
 
             name = vehicle_data.get("Vehicle Name", "")
             v_class = vehicle_data.get("Vehicle Class", "")
-            self.title_label.setText(f"<center><span style='font-size:16pt; color:#00FF96; font-weight:bold;'>{name.upper()}</span><br><span style='font-size:12pt; color:#AAAAAA;'>{v_class}</span></center>")
+            self.title_label.setText(f"<center><span style='font-size:16pt; color:{Theme.PRIMARY}; font-weight:bold;'>{name.upper()}</span><br><span style='font-size:12pt; color:{Theme.TEXT_SECONDARY};'>{v_class}</span></center>")
             self.image_label.clear()
 
             # Rozetleri Temizle
@@ -1644,7 +1865,7 @@ class OverlayHUD(QWidget):
                 if key_str not in exclude_exact and value and value != "Veri Yok":
                     lbl_title = QLabel(f"{key_str}:")
                     lbl_title.setFont(QFont("Segoe UI", 10, QFont.Bold)) 
-                    lbl_title.setStyleSheet("color: #AAAAAA;")
+                    lbl_title.setStyleSheet(f"color: {Theme.TEXT_SECONDARY};")
                     
                     # YENİ: ScrollingLabel Kullanımı (Kayan Yazı)
                     lbl_value = ScrollingLabel(str(value), color="#FFFFFF")

@@ -626,27 +626,97 @@ class LauncherWindow(QMainWindow):
         QMessageBox.information(self, "Bilgi", "Veri güncelleme işlemi başarıyla bitti.")
 
     def save_settings(self):
+        """Ayarları kaydet - hatalı alanları vurgula"""
+        # Önce tüm alanların stilini sıfırla
+        input_fields = [
+            self.input_top, self.input_left, self.input_width, self.input_height,
+            self.input_hud_top, self.input_hud_left, self.input_hud_width, self.input_hud_height
+        ]
+        for field in input_fields:
+            field.setStyleSheet("")  # Stil sıfırla
+        
+        error_field = None
+        error_msg = ""
+        
         try:
-            self.cfg["ocr_region"]["top"] = int(self.input_top.text())
-            self.cfg["ocr_region"]["left"] = int(self.input_left.text())
-            self.cfg["ocr_region"]["width"] = int(self.input_width.text())
-            self.cfg["ocr_region"]["height"] = int(self.input_height.text())
+            # OCR Region validation
+            try:
+                self.cfg["ocr_region"]["top"] = int(self.input_top.text())
+            except ValueError:
+                error_field = self.input_top
+                error_msg = "OCR Top değeri geçerli bir sayı olmalıdır"
+                raise
+            
+            try:
+                self.cfg["ocr_region"]["left"] = int(self.input_left.text())
+            except ValueError:
+                error_field = self.input_left
+                error_msg = "OCR Left değeri geçerli bir sayı olmalıdır"
+                raise
+            
+            try:
+                self.cfg["ocr_region"]["width"] = int(self.input_width.text())
+            except ValueError:
+                error_field = self.input_width
+                error_msg = "OCR Width değeri geçerli bir sayı olmalıdır"
+                raise
+            
+            try:
+                self.cfg["ocr_region"]["height"] = int(self.input_height.text())
+            except ValueError:
+                error_field = self.input_height
+                error_msg = "OCR Height değeri geçerli bir sayı olmalıdır"
+                raise
             
             # HUD Region Key Check (Eski configlerde olmayabilir)
-            if "hud_region" not in self.cfg: self.cfg["hud_region"] = {}
+            if "hud_region" not in self.cfg: 
+                self.cfg["hud_region"] = {}
             
-            self.cfg["hud_region"]["top"] = int(self.input_hud_top.text())
-            self.cfg["hud_region"]["left"] = int(self.input_hud_left.text())
-            self.cfg["hud_region"]["width"] = int(self.input_hud_width.text())
-            self.cfg["hud_region"]["height"] = int(self.input_hud_height.text())
+            try:
+                self.cfg["hud_region"]["top"] = int(self.input_hud_top.text())
+            except ValueError:
+                error_field = self.input_hud_top
+                error_msg = "HUD Top değeri geçerli bir sayı olmalıdır"
+                raise
+            
+            try:
+                self.cfg["hud_region"]["left"] = int(self.input_hud_left.text())
+            except ValueError:
+                error_field = self.input_hud_left
+                error_msg = "HUD Left değeri geçerli bir sayı olmalıdır"
+                raise
+            
+            try:
+                self.cfg["hud_region"]["width"] = int(self.input_hud_width.text())
+            except ValueError:
+                error_field = self.input_hud_width
+                error_msg = "HUD Width değeri geçerli bir sayı olmalıdır"
+                raise
+            
+            try:
+                self.cfg["hud_region"]["height"] = int(self.input_hud_height.text())
+            except ValueError:
+                error_field = self.input_hud_height
+                error_msg = "HUD Height değeri geçerli bir sayı olmalıdır"
+                raise
             
             self.cfg["hotkeys"]["toggle_gallery"] = self.input_hk_gallery.text()
             self.cfg["hotkeys"]["toggle_ownership"] = self.input_hk_own.text()
             
             config.save_config(self.cfg)
             QMessageBox.information(self, "Başarılı", "Ayarlar kaydedildi.")
+            
         except ValueError:
-            QMessageBox.warning(self, "Hata", "Lütfen OCR ve HUD değerleri için sadece sayı giriniz.")
+            # Hatalı alanı vurgula
+            if error_field:
+                error_field.setStyleSheet(f"""
+                    QLineEdit {{
+                        border: 2px solid #d63031;
+                        background: rgba(214, 48, 49, 0.1);
+                    }}
+                """)
+                error_field.setFocus()
+            QMessageBox.warning(self, "Hata", error_msg or "Lütfen geçerli değerler giriniz.")
 
     def auto_scale_settings(self):
         try:
