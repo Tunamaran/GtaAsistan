@@ -144,6 +144,16 @@
 - [x] **[UX]** OCR hatası GUI popup ile bildirim (çözüm adımları dahil)
 - [x] **[UX]** Detaylı hata mesajları (dil paketi eksik, Tesseract yok, vs.)
 
+### 🚀 Tam Otomatik Kurulum Sistemi (Commit: c77d952)
+- [x] **[NEW]** Tesseract OCR gömülü installer (~60MB, portable)
+- [x] **[NEW]** Windows OCR dil paketi otomatik kurulum (admin yetkisi ile)
+- [x] **[NEW]** Python paket otomatik kurulumu (pip install winocr)
+- [x] **[NEW]** config.json otomatik oluşturma (tesseract_path dahil)
+- [x] **[NEW]** Python kontrolü (installer açılışta python --version)
+- [x] **[NEW]** Frozen mod tesseract path desteği (_get_default_tesseract_path)
+- [x] **[DOC]** INSTALL.md: Kapsamlı kullanıcı ve geliştirici kılavuzu
+- [x] **[DOC]** Build süreci dokümantasyonu (Tesseract hazırlık adımları)
+
 ## Yapılacaklar / Geliştirme Önerileri
 - [ ] Farklı ekran çözünürlükleri için otomatik ölçeklendirme.
 - [ ] Performans optimizasyonu (OCR işlem yükünü azaltma).
