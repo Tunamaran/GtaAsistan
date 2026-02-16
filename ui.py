@@ -1937,12 +1937,20 @@ class OverlayHUD(QWidget):
         except Exception as e:
             print(f"[HUD HATASI]: {e}")
 
-    def set_image(self, url, qimage):
-        """QImage'i QPixmap'e dönüştürüp gösterir (Ana thread'de çalışır)."""
-        if qimage is None or qimage.isNull(): 
+    def set_image(self, url, qimage_or_pixmap):
+        """QImage veya QPixmap'i gösterir (Ana thread'de çalışır)."""
+        if qimage_or_pixmap is None:
             return
-        pixmap = QPixmap.fromImage(qimage)  # Ana thread'de dönüştür
-        self.image_cache[url] = pixmap
+        
+        # QPixmap ise direkt kullan, QImage ise dönüştür
+        if isinstance(qimage_or_pixmap, QPixmap):
+            pixmap = qimage_or_pixmap
+        else:
+            if qimage_or_pixmap.isNull():
+                return
+            pixmap = QPixmap.fromImage(qimage_or_pixmap)  # Ana thread'de dönüştür
+            self.image_cache[url] = pixmap
+        
         if self.current_img_url == url:
             self.image_label.setPixmap(pixmap.scaled(self.width() - 30, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
