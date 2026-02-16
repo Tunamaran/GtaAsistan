@@ -23,8 +23,18 @@ _dpi_aware_set = False
 
 # 2560x1600 için Referans Ayarlar (Baseline)
 BASELINE_RESOLUTION = (2560, 1600)
+
+def _get_default_tesseract_path() -> str:
+    """Tesseract varsayılan yolunu döndürür (frozen mod desteği)."""
+    if getattr(sys, 'frozen', False):
+        # Frozen mod (exe): Uygulama dizinindeki tesseract
+        return os.path.join(APP_DIR, "tesseract", "tesseract.exe")
+    else:
+        # Normal mod: Sistem yolu
+        return r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
 BASELINE_CONFIG: Dict[str, Any] = {
-    "tesseract_path": r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    "tesseract_path": _get_default_tesseract_path(),
     "hotkeys": {
         "toggle_gallery": "f11",
         "toggle_ownership": "f9",

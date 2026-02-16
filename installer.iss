@@ -13,7 +13,7 @@ UninstallDisplayIcon={app}\launcher.exe
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardImageFile=compiler:WizClassicImage-IS.bmp
@@ -22,6 +22,9 @@ WizardSmallImageFile=compiler:WizClassicSmallImage-IS.bmp
 [Languages]
 Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Tasks]
+Name: "installwinrt"; Description: "Windows OCR dil paketi kur (Internet gerekli)"; Flags: checked
 
 [Files]
 Source: "dist\GtaAsistan\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -32,6 +35,7 @@ Name: "{group}\GTA Asistan"; Filename: "{app}\launcher.exe"; IconFilename: "{app
 Name: "{autodesktop}\GTA Asistan"; Filename: "{app}\launcher.exe"; IconFilename: "{app}\app_icon.ico"
 
 [Run]
+Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""Add-WindowsCapability -Online -Name 'Language.OCR~~~en-US~0.0.1.0'"""; StatusMsg: "Windows OCR dil paketi kuruluyor..."; Flags: runhidden waituntilterminated; Tasks: installwinrt
 Filename: "{app}\launcher.exe"; Description: "GTA Asistan Baslat"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
@@ -39,3 +43,42 @@ Type: files; Name: "{app}\config.json"
 Type: files; Name: "{app}\garajim.json"
 Type: filesandordirs; Name: "{app}\__pycache__"
 Type: dirifempty; Name: "{app}"
+
+[Code]
+function InitializeSetup(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := True;
+  
+  // Python kontrolu
+  if Exec('cmd.exe', '/C python --version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if ResultCode <> 0 then
+    begin
+      MsgBox('Python bulunamadi! GTA Asistan calismak icin Python gerektirir.' + #13#10 + 
+             'Lutfen https://www.python.org adresinden Python 3.8+ yukleyin.', 
+             mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    // Config dosyasi olustur (Tesseract path ile)
+    if not FileExists(ExpandConstant('{app}\config.json')) then
+    begin
+      SaveStringToFile(ExpandConstant('{app}\config.json'), 
+        '{"tesseract_path": "' + ExpandConstant('{app}') + '\tesseract\tesseract.exe"}', 
+        False);
+    end;
+    
+    // pip install winocr
+    Exec('cmd.exe', '/C pip install winocr', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+end;
