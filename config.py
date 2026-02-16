@@ -1,0 +1,112 @@
+# config.py
+"""Uygulama yapılandırma yönetimi."""
+import json
+import os
+import copy
+from typing import Dict, Any
+
+CONFIG_FILE = "config.json"
+
+import ctypes
+
+# 2560x1600 için Referans Ayarlar (Baseline)
+BASELINE_RESOLUTION = (2560, 1600)
+BASELINE_CONFIG: Dict[str, Any] = {
+    "tesseract_path": r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    "hotkeys": {
+        "toggle_gallery": "f11",
+        "toggle_ownership": "f9",
+        "toggle_ocr": "f10"
+    },
+    "ocr_region": {
+        "top": 0,
+        "left": 0,
+        "width": 678,  # 2560 px genişlikte
+        "height": 635  # 1600 px yükseklikte
+    },
+    "hud_region": {
+        "top": 40,
+        "left": 1325, 
+        "width": 1215,
+        "height": 1510
+    },
+    "autopilot": True,
+    "last_resolution": [2560, 1600], # Son kullanılan çözünürlüğü takip et
+    "ui_geometry": {
+        "LauncherWindow": {"width": 700, "height": 500, "x": -1, "y": -1},
+        "GalleryWindow": {"width": 1200, "height": 800, "x": -1, "y": -1},
+        "SettingsWindow": {"width": 600, "height": 900, "x": -1, "y": -1}
+    }
+}
+
+def get_screen_resolution():
+    """Ana ekran çözünürlüğünü (ölçeklendirilmemiş) döndürür."""
+    try:
+        user32 = ctypes.windll.user32
+        # DPI farkındalığını geçici olarak ayarla (Windows 8.1+)
+        user32.SetProcessDPIAware() 
+        w = user32.GetSystemMetrics(0)
+        h = user32.GetSystemMetrics(1)
+        return w, h
+    except:
+        return 1920, 1080 # Fallback
+
+def get_scaled_default_config() -> Dict[str, Any]:
+    """Mevcut ekran çözünürlüğüne göre ölçeklenmiş varsayılan ayarları döndürür."""
+    current_w, current_h = get_screen_resolution()
+    base_w, base_h = BASELINE_RESOLUTION
+    
+    # Oranları Hesapla
+    scale_x = current_w / base_w
+    scale_y = current_h / base_h
+    
+    config = copy.deepcopy(BASELINE_CONFIG)
+    
+    # OCR Bölgesini Ölçekle
+    ocr = config["ocr_region"]
+    ocr["top"] = int(ocr["top"] * scale_y)
+    ocr["left"] = int(ocr["left"] * scale_x)
+    ocr["width"] = int(ocr["width"] * scale_x)
+    ocr["height"] = int(ocr["height"] * scale_y)
+    
+    # HUD Bölgesini Ölçekle
+    hud = config["hud_region"]
+    hud["top"] = int(hud["top"] * scale_y)
+    # HUD Left -1 ise (sağdan hizalı) ise dokunma, değilse ölçekle
+    if hud["left"] != -1:
+        hud["left"] = int(hud["left"] * scale_x)
+    hud["width"] = int(hud["width"] * scale_x)
+    hud["height"] = int(hud["height"] * scale_y)
+    
+    config["last_resolution"] = [current_w, current_h]
+    
+    print(f"[CONFIG] Çözünürlük algılandı: {current_w}x{current_h}. Ayarlar ölçeklendi.")
+    return config
+
+def load_config() -> Dict[str, Any]:
+    """Config dosyasını yükler, yoksa oluşturur."""
+    if not os.path.exists(CONFIG_FILE):
+        default_cfg = get_scaled_default_config()
+        save_config(default_cfg)
+        return default_cfg
+    
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"[HATA] Config dosyası okunamadı: {e}")
+        return get_scaled_default_config()
+
+def save_config(config_data: Dict[str, Any]) -> None:
+    """Config dosyasını kaydeder."""
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=4)
+    except IOError as e:
+        print(f"[HATA] Config kaydedilemedi: {e}")
+
+def reset_to_defaults() -> None:
+    """Ayarları fabrika varsayılanlarına döndürür (Ölçekli)."""
+    default_cfg = get_scaled_default_config()
+    save_config(default_cfg)
+    print("[BİLGİ] Ayarlar fabrika varsayılanlarına sıfırlandı.")
