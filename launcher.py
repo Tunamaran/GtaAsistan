@@ -976,7 +976,8 @@ class LauncherWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Asistan başlatılamadı:\n{e}")
 
-if __name__ == "__main__":
+if __name__ == "__main__" or getattr(sys, 'frozen', False):
+    # Normal Python veya PyInstaller frozen mod (exe)
     app = QApplication(sys.argv)
     window = LauncherWindow()
     window.show()

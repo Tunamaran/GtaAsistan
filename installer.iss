@@ -46,8 +46,6 @@ Type: dirifempty; Name: "{app}"
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -58,8 +56,5 @@ begin
         '{"tesseract_path": "' + ExpandConstant('{app}') + '\tesseract\tesseract.exe"}', 
         False);
     end;
-    
-    // pip install winocr (opsiyonel - basarisiz olsa da devam et)
-    Exec('cmd.exe', '/C pip install winocr', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;

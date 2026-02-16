@@ -271,6 +271,7 @@ class JarvisApp:
         sys.exit(self.app.exec_())
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" or getattr(sys, 'frozen', False):
+    # Normal Python veya PyInstaller frozen mod (exe)
     jarvis = JarvisApp()
     jarvis.run()
