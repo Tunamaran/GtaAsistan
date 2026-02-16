@@ -228,18 +228,48 @@ class LauncherWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("GTA Asistan Launcher")
         
-        # 1. Kayıtlı Geometriyi Al veya Varsayılanı Hesapla
+        # 1. Ekran boyutlarını al
+        screen = QApplication.primaryScreen().availableGeometry()
+        
+        # 2. Minimum ve maksimum boyutları hesapla
+        min_width, min_height = 500, 400
+        max_width = int(screen.width() * 0.9)
+        max_height = int(screen.height() * 0.9)
+        
+        self.setMinimumSize(min_width, min_height)
+        self.setMaximumSize(max_width, max_height)
+        
+        # 3. Kayıtlı Geometriyi Al veya Varsayılanı Hesapla
         cfg = config.load_config()
         geom = cfg.get("ui_geometry", {}).get("LauncherWindow", {})
         
-        width = geom.get("width", 700)
-        height = geom.get("height", 500)
+        # Varsayılan boyut
+        default_width = min(700, int(screen.width() * 0.5))
+        default_height = min(500, int(screen.height() * 0.6))
         
-        screen = QApplication.primaryScreen().availableGeometry()
+        width = geom.get("width", default_width)
+        height = geom.get("height", default_height)
         
+        # Boyutları limitlere göre kısıtla
+        width = max(min_width, min(width, max_width))
+        height = max(min_height, min(height, max_height))
+        
+        # 4. Pozisyon hesapla (her zaman ekran içinde)
         if geom.get("x", -1) != -1:
-            left, top = geom["x"], geom["y"]
+            left = geom["x"]
+            top = geom["y"]
+            
+            # Pencere ekran dışına çıkmasın
+            if left + width > screen.x() + screen.width():
+                left = screen.x() + screen.width() - width - 20
+            if top + height > screen.y() + screen.height():
+                top = screen.y() + screen.height() - height - 20
+            if left < screen.x():
+                left = screen.x() + 20
+            if top < screen.y():
+                top = screen.y() + 20
         else:
+            # İlk açılışta ekranın ortasında
             left = screen.x() + (screen.width() - width) // 2
             top = screen.y() + (screen.height() - height) // 2
         

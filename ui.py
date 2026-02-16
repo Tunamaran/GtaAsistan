@@ -465,18 +465,49 @@ class GalleryWindow(QWidget):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        # 1. Kayıtlı Geometriyi Al veya Varsayılanı Hesapla
+        # 1. Ekran boyutlarını al
+        screen = QApplication.primaryScreen().availableGeometry()
+        
+        # 2. Minimum ve maksimum boyutları hesapla
+        min_width, min_height = 800, 600
+        # Maksimum boyut ekranın %90'ı (resize için alan bırak)
+        max_width = int(screen.width() * 0.9)
+        max_height = int(screen.height() * 0.9)
+        
+        self.setMinimumSize(min_width, min_height)
+        self.setMaximumSize(max_width, max_height)
+        
+        # 3. Kayıtlı Geometriyi Al veya Varsayılanı Hesapla
         cfg = load_config()
         geom = cfg.get("ui_geometry", {}).get("GalleryWindow", {})
         
-        width = geom.get("width", 1200)
-        height = geom.get("height", 800)
+        # Varsayılan boyut ekranın %70'i (daha rahat başlangıç)
+        default_width = min(1200, int(screen.width() * 0.7))
+        default_height = min(800, int(screen.height() * 0.7))
         
-        screen = QApplication.primaryScreen().availableGeometry()
+        width = geom.get("width", default_width)
+        height = geom.get("height", default_height)
         
+        # Boyutları limitlere göre kısıtla
+        width = max(min_width, min(width, max_width))
+        height = max(min_height, min(height, max_height))
+        
+        # 4. Pozisyon hesapla (her zaman ekran içinde)
         if geom.get("x", -1) != -1:
-            left, top = geom["x"], geom["y"]
+            left = geom["x"]
+            top = geom["y"]
+            
+            # Pencere ekran dışına çıkmasın
+            if left + width > screen.x() + screen.width():
+                left = screen.x() + screen.width() - width - 20
+            if top + height > screen.y() + screen.height():
+                top = screen.y() + screen.height() - height - 20
+            if left < screen.x():
+                left = screen.x() + 20
+            if top < screen.y():
+                top = screen.y() + 20
         else:
+            # İlk açılışta ekranın ortasında
             left = screen.x() + (screen.width() - width) // 2
             top = screen.y() + (screen.height() - height) // 2
         
@@ -2156,16 +2187,52 @@ class SettingsWindow(QWidget):
         self.parent_window = parent
         self.setWindowTitle("Ayarlar")
         
-        # 1. Önce Boyutu Belirle
-        width_s, height_s = 600, 900
+        # 1. Ekran boyutlarını al
         screen = QApplication.primaryScreen().availableGeometry()
         
-        # Ekran yüksekliğinden büyükse sığdır
-        if height_s > screen.height() - 40:
-             height_s = screen.height() - 40
-
-        self.setMinimumSize(400, 500)
-        self.resize(width_s, height_s)
+        # 2. Minimum ve maksimum boyutları hesapla
+        min_width, min_height = 400, 500
+        max_width = int(screen.width() * 0.9)
+        max_height = int(screen.height() * 0.9)
+        
+        self.setMinimumSize(min_width, min_height)
+        self.setMaximumSize(max_width, max_height)
+        
+        # 3. Kayıtlı geometriyi al veya varsayılanı kullan
+        cfg = load_config()
+        geom = cfg.get("ui_geometry", {}).get("SettingsWindow", {})
+        
+        # Varsayılan boyut
+        default_width = min(600, int(screen.width() * 0.4))
+        default_height = min(900, int(screen.height() * 0.8))
+        
+        width = geom.get("width", default_width)
+        height = geom.get("height", default_height)
+        
+        # Boyutları limitlere göre kısıtla
+        width = max(min_width, min(width, max_width))
+        height = max(min_height, min(height, max_height))
+        
+        # 4. Pozisyon hesapla (her zaman ekran içinde)
+        if geom.get("x", -1) != -1:
+            left = geom["x"]
+            top = geom["y"]
+            
+            # Pencere ekran dışına çıkmasın
+            if left + width > screen.x() + screen.width():
+                left = screen.x() + screen.width() - width - 20
+            if top + height > screen.y() + screen.height():
+                top = screen.y() + screen.height() - height - 20
+            if left < screen.x():
+                left = screen.x() + 20
+            if top < screen.y():
+                top = screen.y() + 20
+        else:
+            # İlk açılışta ekranın ortasında
+            left = screen.x() + (screen.width() - width) // 2
+            top = screen.y() + (screen.height() - height) // 2
+        
+        self.setGeometry(left, top, width, height)
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool)
         
         # Resizer'ı başlat
