@@ -273,6 +273,7 @@ class LauncherWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Pencere kapandığında boyut ve konumu kaydet."""
+        # Geometry kaydet
         cfg = config.load_config()
         if "ui_geometry" not in cfg: cfg["ui_geometry"] = {}
         
@@ -284,7 +285,19 @@ class LauncherWindow(QMainWindow):
             "y": geom.y()
         }
         config.save_config(cfg)
-        super().closeEvent(event)
+        
+        # Autopilot kontrolü
+        if self.autopilot_chk.isChecked():
+            event.ignore()
+            self.hide()
+            self.tray_icon.showMessage(
+                "Auto-Pilot Aktif",
+                "Launcher arka planda GTA 5'i bekliyor.\nÇıkmak için sistem tepsisini kullanın.",
+                QSystemTrayIcon.Information,
+                2000
+            )
+        else:
+            self.quit_app()
 
     def mousePressEvent(self, event):
         self.resizer.handle_mouse_press(event)
@@ -294,24 +307,118 @@ class LauncherWindow(QMainWindow):
 
     def mouseReleaseEvent(self, event):
         self.resizer.handle_mouse_release(event)
+    
+    # Title bar drag metodları
+    def _title_bar_press(self, event):
+        """Title bar'a tıklandığında pencereyi taşımaya başla"""
+        if event.button() == Qt.LeftButton:
+            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+    
+    def _title_bar_move(self, event):
+        """Title bar sürüklenirken pencereyi taşı"""
+        if event.buttons() == Qt.LeftButton and self._drag_pos is not None:
+            self.move(event.globalPos() - self._drag_pos)
+            event.accept()
+    
+    def _title_bar_release(self, event):
+        """Title bar bırakıldığında drag'i bitir"""
+        self._drag_pos = None
+        event.accept()
 
     def init_ui(self):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         self.setMinimumSize(500, 400) # Minimum boyut sınırı
         layout = QVBoxLayout(main_widget)
-        layout.setContentsMargins(10, 10, 10, 10) # Kenar tutacakları için boşluk
+        layout.setContentsMargins(0, 0, 0, 0)  # Tam ekran title bar için
+        layout.setSpacing(0)
+        
+        # === CUSTOM TITLE BAR ===
+        title_bar = QWidget()
+        title_bar.setFixedHeight(35)
+        title_bar.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d30;
+                border-bottom: 1px solid #3d3d3d;
+            }
+        """)
+        title_bar_layout = QHBoxLayout(title_bar)
+        title_bar_layout.setContentsMargins(10, 0, 5, 0)
+        title_bar_layout.setSpacing(0)
+        
+        # Başlık metni (draggable alan)
+        self.title_label = QLabel("🚗 GTA Asistan Launcher")
+        self.title_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        self.title_label.setStyleSheet("color: #cccccc; background: transparent; border: none;")
+        title_bar_layout.addWidget(self.title_label)
+        title_bar_layout.addStretch()
+        
+        # Minimize butonu
+        self.min_btn = QPushButton("—")
+        self.min_btn.setFixedSize(45, 35)
+        self.min_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #cccccc;
+                border: none;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #3e3e42;
+            }
+        """)
+        self.min_btn.clicked.connect(self.showMinimized)
+        title_bar_layout.addWidget(self.min_btn)
+        
+        # Close butonu
+        self.close_btn = QPushButton("×")
+        self.close_btn.setFixedSize(45, 35)
+        self.close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #cccccc;
+                border: none;
+                font-size: 22px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e81123;
+                color: white;
+            }
+        """)
+        self.close_btn.clicked.connect(self.close)
+        title_bar_layout.addWidget(self.close_btn)
+        
+        layout.addWidget(title_bar)
+        
+        # Drag desteği için title bar event handling
+        self._drag_pos = None
+        title_bar.mousePressEvent = self._title_bar_press
+        title_bar.mouseMoveEvent = self._title_bar_move
+        title_bar.mouseReleaseEvent = self._title_bar_release
+        self.title_label.mousePressEvent = self._title_bar_press
+        self.title_label.mouseMoveEvent = self._title_bar_move
+        self.title_label.mouseReleaseEvent = self._title_bar_release
+        
+        # === ANA İÇERİK ===
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(10, 10, 10, 10)
         
         # Başlık ve Versiyon
         header_layout = QHBoxLayout()
         title_lbl = QLabel("GTA Asistan Yöneticisi")
         title_lbl.setFont(QFont("Segoe UI", 20, QFont.Bold))
         header_layout.addWidget(title_lbl)
-        layout.addLayout(header_layout)
+        content_layout.addLayout(header_layout)
         
         # Sekmeler
         self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
+        content_layout.addWidget(self.tabs)
+        
+        layout.addWidget(content_widget)
         
         # Sekme İçeriklerini Oluştur
         data_tab = QWidget()
