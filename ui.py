@@ -616,13 +616,21 @@ class GalleryWindow(QWidget):
         self.apply_filters() 
 
     def mousePressEvent(self, event):
-        self.resizer.handle_mouse_press(event)
+        # Sadece sol tuş ile resize/drag
+        if event.button() == Qt.LeftButton:
+            self.resizer.handle_mouse_press(event)
+        else:
+            # Sağ tuş veya diğer butonlar için varsayılan davranış
+            super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         self.resizer.handle_mouse_move(event)
 
     def mouseReleaseEvent(self, event):
-        self.resizer.handle_mouse_release(event)
+        if event.button() == Qt.LeftButton:
+            self.resizer.handle_mouse_release(event)
+        else:
+            super().mouseReleaseEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -2433,13 +2441,21 @@ class SettingsWindow(QWidget):
         self.load_settings()
 
     def mousePressEvent(self, event):
-        self.resizer.handle_mouse_press(event)
+        # Sadece sol tuş ile resize/drag
+        if event.button() == Qt.LeftButton:
+            self.resizer.handle_mouse_press(event)
+        else:
+            # Sağ tuş veya diğer butonlar için varsayılan davranış
+            super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         self.resizer.handle_mouse_move(event)
 
     def mouseReleaseEvent(self, event):
-        self.resizer.handle_mouse_release(event)
+        if event.button() == Qt.LeftButton:
+            self.resizer.handle_mouse_release(event)
+        else:
+            super().mouseReleaseEvent(event)
 
     def closeEvent(self, event):
         """Pencere kapandığında boyut ve konumu kaydet."""

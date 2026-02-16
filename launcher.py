@@ -339,13 +339,21 @@ class LauncherWindow(QMainWindow):
         config.save_config(cfg)
 
     def mousePressEvent(self, event):
-        self.resizer.handle_mouse_press(event)
+        # Sadece sol tuş ile resize/drag
+        if event.button() == Qt.LeftButton:
+            self.resizer.handle_mouse_press(event)
+        else:
+            # Sağ tuş veya diğer butonlar için varsayılan davranış
+            super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         self.resizer.handle_mouse_move(event)
 
     def mouseReleaseEvent(self, event):
-        self.resizer.handle_mouse_release(event)
+        if event.button() == Qt.LeftButton:
+            self.resizer.handle_mouse_release(event)
+        else:
+            super().mouseReleaseEvent(event)
     
     # Title bar drag metodları
     def _title_bar_press(self, event):
