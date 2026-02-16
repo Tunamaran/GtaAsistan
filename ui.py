@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
 )
 # PyQt5 - Core
 from PyQt5.QtCore import (
-    Qt, QTimer, QRect, QSize, QPoint, QRectF, pyqtSignal
+    Qt, QTimer, QRect, QSize, QPoint, QRectF, pyqtSignal, QEvent
 )
 # PyQt5 - GUI
 from PyQt5.QtGui import (
@@ -544,6 +544,10 @@ class GalleryWindow(QWidget):
         self.main_layout.addWidget(self.bg_frame)
         self.main_layout.setContentsMargins(10, 10, 10, 10) # 10px Resize Zone
         
+        # Event filter ekle - mouse tracking için
+        self.bg_frame.installEventFilter(self)
+        self.bg_frame.setMouseTracking(True)
+        
         self.bg_layout = QVBoxLayout(self.bg_frame)
         self.bg_layout.setContentsMargins(25, 25, 25, 25)
 
@@ -581,13 +585,41 @@ class GalleryWindow(QWidget):
         self.apply_filters() 
 
     def mousePressEvent(self, event):
-        self.resizer.handle_mouse_press(event)
+        # Resize için event'i handle et
+        # Not: Child widget'lar üzerindeyse bile kenar kontrolü yap
+        if event.button() == Qt.LeftButton:
+            # Global pozisyonu window koordinatlarına çevir
+            pos = event.pos()
+            edge = self.resizer.get_edge(pos)
+            if edge:
+                # Kenar bölgesindeyiz, resize işlemi
+                self.resizer.handle_mouse_press(event)
+                event.accept()
+                return
+        
+        # Kenar bölgesinde değilsek, normal event handling
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        # Her zaman cursor'u güncelle ve resize/drag işlemlerini handle et
         self.resizer.handle_mouse_move(event)
 
     def mouseReleaseEvent(self, event):
         self.resizer.handle_mouse_release(event)
+    
+    def eventFilter(self, obj, event):
+        """bg_frame ve child'lardan gelen mouse event'leri yakalayıp cursor'u güncelle"""
+        if obj == self.bg_frame:
+            if event.type() == QEvent.MouseMove:
+                # bg_frame üzerindeki mouse pozisyonunu window koordinatlarına çevir
+                global_pos = self.bg_frame.mapToGlobal(event.pos())
+                window_pos = self.mapFromGlobal(global_pos)
+                
+                # Kenar kontrolü ve cursor güncelleme
+                edge = self.resizer.get_edge(window_pos)
+                self.resizer.update_cursor(edge)
+        
+        return super().eventFilter(obj, event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
