@@ -3,6 +3,8 @@
 import json
 import re
 import os
+import tempfile
+import threading
 from typing import Optional, Tuple, List, Dict
 
 # === Garaj Sistemi ===
@@ -11,52 +13,82 @@ GARAGE_FILE = "garajim.json"
 # Basit dosya cache (Tekrar tekrar disk okumasını önler)
 _garage_cache: Optional[List[str]] = None
 _garage_mtime: float = 0
+_garage_lock = threading.Lock()  # Thread-safe erişim için
 
 def load_garage() -> List[str]:
-    """Kayıtlı araç listesini yükler (cache destekli)."""
+    """Kayıtlı araç listesini yükler (cache destekli, thread-safe)."""
     global _garage_cache, _garage_mtime
     
-    if not os.path.exists(GARAGE_FILE):
-        _garage_cache = []
-        return []
-    
-    try:
-        current_mtime = os.path.getmtime(GARAGE_FILE)
-        # Cache hâlâ geçerliyse dosyadan tekrar okuma
-        if _garage_cache is not None and current_mtime <= _garage_mtime:
-            return _garage_cache
+    with _garage_lock:
+        if not os.path.exists(GARAGE_FILE):
+            _garage_cache = []
+            return []
         
-        with open(GARAGE_FILE, "r", encoding="utf-8") as f:
-            _garage_cache = json.load(f)
-            _garage_mtime = current_mtime
-            return _garage_cache
-    except (json.JSONDecodeError, IOError) as e:
-        print(f"[UYARI] Garaj dosyası okunamadı: {e}")
-        return []
+        try:
+            current_mtime = os.path.getmtime(GARAGE_FILE)
+            # Cache hâlâ geçerliyse dosyadan tekrar okuma
+            if _garage_cache is not None and current_mtime <= _garage_mtime:
+                return list(_garage_cache)  # Kopya döndür
+            
+            with open(GARAGE_FILE, "r", encoding="utf-8") as f:
+                _garage_cache = json.load(f)
+                _garage_mtime = current_mtime
+                return list(_garage_cache)  # Kopya döndür
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"[UYARI] Garaj dosyası okunamadı: {e}")
+            return []
 
 def save_garage(garage_list: List[str]) -> None:
-    """Listeyi dosyaya kaydeder ve cache'i günceller."""
+    """Listeyi dosyaya atomik şekilde kaydeder ve cache'i günceller (thread-safe)."""
     global _garage_cache, _garage_mtime
-    try:
-        with open(GARAGE_FILE, "w", encoding="utf-8") as f:
-            json.dump(garage_list, f, indent=4)
-        # Cache'i güncelle
-        _garage_cache = list(garage_list)  # Savunma kopyası (referans paylaşımını önle)
-        _garage_mtime = os.path.getmtime(GARAGE_FILE)
-    except IOError as e:
-        print(f"[HATA] Garaj kaydedilemedi: {e}")
+    
+    with _garage_lock:
+        temp_fd = None
+        temp_path = None
+        try:
+            # Atomik yazma: temp file + rename
+            dir_path = os.path.dirname(GARAGE_FILE) or "."
+            temp_fd, temp_path = tempfile.mkstemp(dir=dir_path, prefix=".tmp_garage_", suffix=".json", text=True)
+            
+            with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+                temp_fd = None  # fdopen aldı
+                json.dump(garage_list, f, indent=4, ensure_ascii=False)
+            
+            # Atomik taşıma
+            if os.path.exists(GARAGE_FILE):
+                os.replace(temp_path, GARAGE_FILE)
+            else:
+                os.rename(temp_path, GARAGE_FILE)
+            
+            # Cache'i güncelle
+            _garage_cache = list(garage_list)
+            _garage_mtime = os.path.getmtime(GARAGE_FILE)
+        except IOError as e:
+            print(f"[HATA] Garaj kaydedilemedi: {e}")
+            # Cleanup
+            if temp_fd is not None:
+                try:
+                    os.close(temp_fd)
+                except:
+                    pass
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
 
 def toggle_vehicle_ownership(vehicle_name: str) -> bool:
-    """Aracı varsa siler, yoksa ekler. Sonuç: True=eklendi, False=silindi."""
-    garage = load_garage()
-    if vehicle_name in garage:
-        garage.remove(vehicle_name)
-        status = False
-    else:
-        garage.append(vehicle_name)
-        status = True
-    save_garage(garage)
-    return status
+    """Aracı varsa siler, yoksa ekler. Sonuç: True=eklendi, False=silindi. Thread-safe."""
+    with _garage_lock:
+        garage = load_garage()
+        if vehicle_name in garage:
+            garage.remove(vehicle_name)
+            status = False
+        else:
+            garage.append(vehicle_name)
+            status = True
+        save_garage(garage)
+        return status
 
 def parse_number(text_val: Optional[str]) -> float:
     """Metin içinden sayısal değer çıkarır."""

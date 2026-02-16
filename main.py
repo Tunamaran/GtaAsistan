@@ -1,6 +1,7 @@
 # main.py
 """GTA Asistan - J.A.R.V.I.S Ana Modül"""
 import sys
+from collections import OrderedDict
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
 from PyQt5.QtCore import Qt
@@ -9,6 +10,35 @@ from workers import OcrThread, HotkeyThread
 from ui import OverlayHUD, GalleryWindow, StatusHUD
 from config import load_config
 from history import VehicleHistory
+
+
+class LRUCache:
+    """LRU (Least Recently Used) cache implementasyonu."""
+    def __init__(self, max_size=200):
+        self.cache = OrderedDict()
+        self.max_size = max_size
+    
+    def get(self, key):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+            return self.cache[key]
+        return None
+    
+    def set(self, key, value):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if len(self.cache) > self.max_size:
+            self.cache.popitem(last=False)
+    
+    def __contains__(self, key):
+        return key in self.cache
+    
+    def __getitem__(self, key):
+        return self.get(key)
+    
+    def __setitem__(self, key, value):
+        self.set(key, value)
 
 
 def create_tray_icon() -> QIcon:
@@ -47,7 +77,7 @@ class JarvisApp:
             print("[HATA] Araç veritabanı yüklenemedi! Çıkılıyor...")
             sys.exit()
 
-        self.image_cache = {}
+        self.image_cache = LRUCache(max_size=200)  # LRU cache
         self.hud = OverlayHUD(self.image_cache)
         self.hud.db_data = self.db_data  # Danışman için veritabanı referansı
         self.hud.hide()
@@ -187,9 +217,21 @@ class JarvisApp:
                 self.settings_was_visible = False
     
     def quit_app(self):
-        """Uygulamadan tamamen çıkar."""
+        """Uygulamadan tamamen çıkar. Thread'leri düzgün kapatır."""
+        print("[SİSTEM] Uygulama kapatılıyor...")
+        
+        # OCR thread'ini durdur
         self.ocr_thread.running = False
+        self.ocr_thread.wait(2000)  # 2 saniye bekle
+        
+        # Hotkey thread'ini durdur
+        self.hotkey_thread.stop()
+        self.hotkey_thread.wait(2000)  # 2 saniye bekle
+        
+        # Tray icon'u gizle
         self.tray_icon.hide()
+        
+        # Uygulamayı kapat
         self.app.quit()
 
     def on_vehicle_found(self, vehicle_data: dict) -> None:

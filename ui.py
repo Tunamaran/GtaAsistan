@@ -991,13 +991,14 @@ class GalleryWindow(QWidget):
 
 
 
-    def cache_and_set(self, url, pixmap, card):
-
+    def cache_and_set(self, url, qimage, card):
+        """QImage'i QPixmap'e dönüştürüp cache'e ekler (Ana thread'de çalışır)."""
+        pixmap = QPixmap.fromImage(qimage)  # Ana thread'de dönüştür
         self.image_cache[url] = pixmap
-
-        try: card.set_image(pixmap)
-
-        except RuntimeError: pass
+        try: 
+            card.set_image(pixmap)
+        except RuntimeError: 
+            pass
 
 
 
@@ -1654,8 +1655,11 @@ class OverlayHUD(QWidget):
         except Exception as e:
             print(f"[HUD HATASI]: {e}")
 
-    def set_image(self, url, pixmap):
-        if pixmap is None or pixmap.isNull(): return
+    def set_image(self, url, qimage):
+        """QImage'i QPixmap'e dönüştürüp gösterir (Ana thread'de çalışır)."""
+        if qimage is None or qimage.isNull(): 
+            return
+        pixmap = QPixmap.fromImage(qimage)  # Ana thread'de dönüştür
         self.image_cache[url] = pixmap
         if self.current_img_url == url:
             self.image_label.setPixmap(pixmap.scaled(self.width() - 30, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))

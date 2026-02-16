@@ -3,11 +3,15 @@
 import json
 import os
 import copy
+import tempfile
 from typing import Dict, Any
 
 CONFIG_FILE = "config.json"
 
 import ctypes
+
+# DPI Awareness flag (sadece bir kez çağrılmalı)
+_dpi_aware_set = False
 
 # 2560x1600 için Referans Ayarlar (Baseline)
 BASELINE_RESOLUTION = (2560, 1600)
@@ -41,15 +45,18 @@ BASELINE_CONFIG: Dict[str, Any] = {
 
 def get_screen_resolution():
     """Ana ekran çözünürlüğünü (ölçeklendirilmemiş) döndürür."""
+    global _dpi_aware_set
     try:
         user32 = ctypes.windll.user32
-        # DPI farkındalığını geçici olarak ayarla (Windows 8.1+)
-        user32.SetProcessDPIAware() 
+        # DPI farkındalığını sadece bir kez ayarla
+        if not _dpi_aware_set:
+            user32.SetProcessDPIAware()
+            _dpi_aware_set = True
         w = user32.GetSystemMetrics(0)
         h = user32.GetSystemMetrics(1)
         return w, h
     except:
-        return 1920, 1080 # Fallback
+        return 1920, 1080  # Fallback
 
 def get_scaled_default_config() -> Dict[str, Any]:
     """Mevcut ekran çözünürlüğüne göre ölçeklenmiş varsayılan ayarları döndürür."""
@@ -98,12 +105,35 @@ def load_config() -> Dict[str, Any]:
         return get_scaled_default_config()
 
 def save_config(config_data: Dict[str, Any]) -> None:
-    """Config dosyasını kaydeder."""
+    """Config dosyasını atomik şekilde kaydeder."""
+    temp_fd = None
+    temp_path = None
     try:
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config_data, f, indent=4)
+        dir_path = os.path.dirname(CONFIG_FILE) or "."
+        temp_fd, temp_path = tempfile.mkstemp(dir=dir_path, prefix=".tmp_config_", suffix=".json", text=True)
+        
+        with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+            temp_fd = None  # fdopen aldı
+            json.dump(config_data, f, indent=4, ensure_ascii=False)
+        
+        # Atomik taşıma
+        if os.path.exists(CONFIG_FILE):
+            os.replace(temp_path, CONFIG_FILE)
+        else:
+            os.rename(temp_path, CONFIG_FILE)
     except IOError as e:
         print(f"[HATA] Config kaydedilemedi: {e}")
+        # Cleanup
+        if temp_fd is not None:
+            try:
+                os.close(temp_fd)
+            except:
+                pass
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
 
 def reset_to_defaults() -> None:
     """Ayarları fabrika varsayılanlarına döndürür (Ölçekli)."""

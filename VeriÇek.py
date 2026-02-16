@@ -89,15 +89,64 @@ def get_all_vehicle_links():
     log(f"\n   >>> TOPLAM {len(links)} EŞSİZ ARAÇ LİNKİ BULUNDU! <<<")
     return list(links)
 
-# ... (get_vehicle_details function remains mostly same, just replace print with log if needed for errors) ...
-# Actually get_vehicle_details has prints too. I should update it. 
-# But let's handle that in a separate chunk if it's too big.
-# Wait, replace_file_content replaces contiguous blocks.
-# I can replace the whole file content if I want, or just the main logic.
-# The user file is 234 lines. I'll stick to modifying relevant parts.
+def get_vehicle_details(url: str):
+    """Tek bir araç sayfasından tüm bilgileri çeker."""
+    try:
+        res = scraper.get(url, headers=headers, timeout=15)
+        if res.status_code != 200:
+            log(f"   !!! Erişim Hatası: {res.status_code}")
+            return None
+        
+        soup = BeautifulSoup(res.content, "html.parser")
+        vehicle_data = {"Link": url}
+        
+        # Başlık (Vehicle Name)
+        title_tag = soup.find("h1", class_="entry-title")
+        if title_tag:
+            vehicle_data["Vehicle Name"] = clean_text(title_tag.get_text())
+        
+        # Tüm table satırlarını topla
+        for row in soup.find_all("tr"):
+            th = row.find("th")
+            td = row.find("td")
+            if th and td:
+                key = clean_text(th.get_text())
+                value = clean_text(td.get_text())
+                vehicle_data[key] = value
+        
+        # Resim URL'si
+        img_tag = soup.select_one("div.vehicle-image img")
+        if img_tag and img_tag.get("src"):
+            vehicle_data["Image URL"] = img_tag["src"]
+        else:
+            vehicle_data["Image URL"] = "Resim Bulunamadı"
+        
+        return vehicle_data
+    except Exception as e:
+        log(f"   Hata: {e}")
+        return None
 
-# Let's redefine get_vehicle_details logging as well.
-# ...
+def save_data(data: list, filename: str):
+    """JSON verisini atomik şekilde kaydeder."""
+    import tempfile
+    temp_fd, temp_path = tempfile.mkstemp(dir=".", prefix=".tmp_", suffix=".json", text=True)
+    try:
+        with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        
+        # Atomik taşıma
+        if os.path.exists(filename):
+            os.replace(temp_path, filename)
+        else:
+            os.rename(temp_path, filename)
+    except Exception as e:
+        # Hata durumunda temp dosyayı temizle
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        raise e
 
 # --- ANA DÖNGÜ (GUI İÇİN) ---
 def run_update(callback=None, incremental=False):

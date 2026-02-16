@@ -52,6 +52,10 @@ class HotkeyThread(QThread):
     toggle_ownership_signal = pyqtSignal()
     toggle_ocr_signal = pyqtSignal()
 
+    def __init__(self):
+        super().__init__()
+        self.running = True
+
     def run(self) -> None:
         hk_gallery = cfg["hotkeys"].get("toggle_gallery", "f11")
         keyboard.add_hotkey(hk_gallery, lambda: self.toggle_gallery_signal.emit())
@@ -62,12 +66,21 @@ class HotkeyThread(QThread):
         hk_ocr = cfg["hotkeys"].get("toggle_ocr", "f10")
         keyboard.add_hotkey(hk_ocr, lambda: self.toggle_ocr_signal.emit())
         
-        keyboard.wait()
+        # Bloklayıcı wait yerine loop kullan
+        while self.running:
+            time.sleep(0.1)
+        
+        # Cleanup
+        keyboard.unhook_all()
+
+    def stop(self):
+        """Thread'i durdur."""
+        self.running = False
 
 
 class ImageLoaderThread(QThread):
     """URL'den resim indiren thread."""
-    image_loaded_signal = pyqtSignal(str, QPixmap)
+    image_loaded_signal = pyqtSignal(str, QImage)  # QPixmap yerine QImage
     
     def __init__(self, url: str):
         super().__init__()
@@ -82,8 +95,7 @@ class ImageLoaderThread(QThread):
                     img = QImage()
                     img.loadFromData(resp.content)
                     if not img.isNull():
-                        pixmap = QPixmap.fromImage(img)
-                        self.image_loaded_signal.emit(self.url, pixmap)
+                        self.image_loaded_signal.emit(self.url, img)  # QImage gönder
         except Exception as e:
             print(f"[UYARI] Resim yükleme hatası: {e}")
 
@@ -273,185 +285,191 @@ class OcrThread(QThread):
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         
-        sct = mss.mss()
         monitor = cfg.get("ocr_region", {"top": 0, "left": 0, "width": 500, "height": 800})
         last_matched = ""
         last_seen = time.time()
         
         self.no_vehicle_counter = 0
 
-        while self.running:
-            # Önce pencere kontrolü
-            is_gta = self._is_gta_active()
-            if is_gta != self.last_gta_state:
-                self.last_gta_state = is_gta
-                self.gta_window_active_signal.emit(is_gta)
-            
-            if not is_gta:
-                self.hide_hud_signal.emit()
-                time.sleep(1)
-                continue
-
-            # Duraklatma kontrolü
-            if self.paused:
-                self.hide_hud_signal.emit()
-                time.sleep(1)
-                continue
-
+        with mss.mss() as sct:  # Context manager
             try:
-                # 1. Ekranı yakala
-                screen_grab = np.array(sct.grab(monitor))
-                gray = cv2.cvtColor(screen_grab, cv2.COLOR_BGRA2GRAY)
-                # İYİLEŞTİRME: Resmi 2x büyüt (Küçük metinleri okumak için - örn. Dubsta 6x6)
-                h_orig, w_orig = gray.shape
-                gray_2x = cv2.resize(gray, (w_orig*2, h_orig*2), interpolation=cv2.INTER_LINEAR)
-                
-                # 2. Windows OCR ile tüm satırları oku (Büyütülmüş resim ile)
-                lines = self._run_winocr(gray_2x)
-                
-                candidates = []  # (araç_ismi, skor, parlaklık, ham_metin)
-                
-                for line in lines:
-                    raw_text = line.text.strip()
+                while self.running:
+                    # Önce pencere kontrolü
+                    is_gta = self._is_gta_active()
+                    if is_gta != self.last_gta_state:
+                        self.last_gta_state = is_gta
+                        self.gta_window_active_signal.emit(is_gta)
                     
-                    # 3. Temizle
-                    clean = self._clean_text(raw_text)
-                    if not clean:
+                    if not is_gta:
+                        self.hide_hud_signal.emit()
+                        time.sleep(1)
                         continue
-                    
-                    # 4. Eşleştir
-                    match_result = self._match_vehicle(clean)
-                    if match_result:
-                        match, score = match_result
+
+                    # Duraklatma kontrolü
+                    if self.paused:
+                        self.hide_hud_signal.emit()
+                        time.sleep(1)
+                        continue
+
+                    try:
+                        # 1. Ekranı yakala
+                        screen_grab = np.array(sct.grab(monitor))
+                        gray = cv2.cvtColor(screen_grab, cv2.COLOR_BGRA2GRAY)
+                        # İYİLEŞTİRME: Resmi 2x büyüt (Küçük metinleri okumak için - örn. Dubsta 6x6)
+                        h_orig, w_orig = gray.shape
+                        gray_2x = cv2.resize(gray, (w_orig*2, h_orig*2), interpolation=cv2.INTER_LINEAR)
                         
-                        # 5. Parlaklık Hesapla (Highlight tespiti için)
-                        # Koordinatlar 2x büyütülmüş resme göredir
-                        words = list(line.words)
-                        if words:
-                            w_first = words[0].bounding_rect
-                            w_last = words[-1].bounding_rect
+                        # 2. Windows OCR ile tüm satırları oku (Büyütülmüş resim ile)
+                        lines = self._run_winocr(gray_2x)
+                        
+                        candidates = []  # (araç_ismi, skor, parlaklık, ham_metin)
+                        
+                        for line in lines:
+                            raw_text = line.text.strip()
                             
-                            x = int(w_first.x)
-                            y = int(w_first.y)
-                            w = int(w_last.x + w_last.width - w_first.x)
-                            h = int(max(w_first.height, w_last.height))
+                            # 3. Temizle
+                            clean = self._clean_text(raw_text)
+                            if not clean:
+                                continue
                             
-                            # Güvenlik kontrolü (gray_2x boyutlarına göre)
-                            y1 = max(0, y)
-                            y2 = min(gray_2x.shape[0], y + h)
-                            x1 = max(0, x)
-                            x2 = min(gray_2x.shape[1], x + w)
+                            # 4. Eşleştir
+                            match_result = self._match_vehicle(clean)
+                            if match_result:
+                                match, score = match_result
+                                
+                                # 5. Parlaklık Hesapla (Highlight tespiti için)
+                                # Koordinatlar 2x büyütülmüş resme göredir
+                                words = list(line.words)
+                                if words:
+                                    w_first = words[0].bounding_rect
+                                    w_last = words[-1].bounding_rect
+                                    
+                                    x = int(w_first.x)
+                                    y = int(w_first.y)
+                                    w = int(w_last.x + w_last.width - w_first.x)
+                                    h = int(max(w_first.height, w_last.height))
+                                    
+                                    # Güvenlik kontrolü (gray_2x boyutlarına göre)
+                                    y1 = max(0, y)
+                                    y2 = min(gray_2x.shape[0], y + h)
+                                    x1 = max(0, x)
+                                    x2 = min(gray_2x.shape[1], x + w)
+                                    
+                                    if x2 > x1 and y2 > y1:
+                                        roi = gray_2x[y1:y2, x1:x2]
+                                        brightness = float(np.mean(roi))
+                                        candidates.append((match, score, brightness, clean))
+                        
+                        # 6. En parlak (highlight olan) adayı seç
+                        # YENİ: Sadece parlak (seçili) öğeleri dikkate al (Başlıkları ve seçili olmayanları eler)
+                        candidates = [c for c in candidates if c[2] >= 100]
+                        
+                        if candidates:
+                            # Parlaklığa göre sırala (en yüksek en başa)
+                            candidates.sort(key=lambda x: x[2], reverse=True)
                             
-                            if x2 > x1 and y2 > y1:
-                                roi = gray_2x[y1:y2, x1:x2]
-                                brightness = float(np.mean(roi))
-                                candidates.append((match, score, brightness, clean))
-                
-                # 6. En parlak (highlight olan) adayı seç
-                # YENİ: Sadece parlak (seçili) öğeleri dikkate al (Başlıkları ve seçili olmayanları eler)
-                candidates = [c for c in candidates if c[2] >= 100]
-                
-                if candidates:
-                    # Parlaklığa göre sırala (en yüksek en başa)
-                    candidates.sort(key=lambda x: x[2], reverse=True)
+                            best_match, best_score, best_br, best_clean = candidates[0]
+                            
+                            # Debug
+                            # print(f"[OCR] Adaylar: {[(c[3], int(c[2])) for c in candidates]}")
+                            
+                            detected = True
+                            last_seen = time.time()
+                            
+                            if best_match != last_matched:
+                                last_matched = best_match
+                                print(f"[OCR SEÇİLDİ] {best_clean} -> {best_match} (Skor: {best_score}, Parlaklık: {best_br:.1f})")
+                                self.vehicle_found_signal.emit(self.search_dict[best_match])
+                        
+                        # Araç kaybolursa HUD'ı gizle
+                        if not candidates and last_matched != "" and (time.time() - last_seen > self.HUD_TIMEOUT):
+                            self.hide_hud_signal.emit()
+                            last_matched = ""
                     
-                    best_match, best_score, best_br, best_clean = candidates[0]
+                    except Exception as e:
+                        print(f"[HATA] OCR Döngüsü Hatası: {e}")
+                        self.hide_hud_signal.emit()
+                        last_matched = ""
+                        time.sleep(1)
                     
-                    # Debug
-                    # print(f"[OCR] Adaylar: {[(c[3], int(c[2])) for c in candidates]}")
-                    
-                    detected = True
-                    last_seen = time.time()
-                    
-                    if best_match != last_matched:
-                        last_matched = best_match
-                        print(f"[OCR SEÇİLDİ] {best_clean} -> {best_match} (Skor: {best_score}, Parlaklık: {best_br:.1f})")
-                        self.vehicle_found_signal.emit(self.search_dict[best_match])
-                
-                # Araç kaybolursa HUD'ı gizle
-                if not candidates and last_matched != "" and (time.time() - last_seen > self.HUD_TIMEOUT):
-                    self.hide_hud_signal.emit()
-                    last_matched = ""
-            
-            except Exception as e:
-                print(f"[HATA] OCR Döngüsü Hatası: {e}")
-                self.hide_hud_signal.emit()
-                last_matched = ""
-                time.sleep(1)
-            
-            time.sleep(0.2)  # Seri tepki için düşük gecikme
-        
-        self._loop.close()
+                    time.sleep(0.2)  # Seri tepki için düşük gecikme
+            finally:
+                if self._loop:
+                    self._loop.close()
 
     def _run_tesseract_loop(self) -> None:
         """Tesseract döngüsü: Kontur tabanlı, ROI bazlı OCR."""
-        sct = mss.mss()
         monitor = cfg.get("ocr_region", {"top": 0, "left": 0, "width": 500, "height": 800})
         last_matched = ""
         last_seen = time.time()
 
-        while self.running:
-            # Pencere Kontrolü (Tesseract Modu İçin Ekledim)
-            is_gta = self._is_gta_active()
-            if is_gta != self.last_gta_state:
-                self.last_gta_state = is_gta
-                self.gta_window_active_signal.emit(is_gta)
-            
-            if not is_gta:
-                self.hide_hud_signal.emit()
-                time.sleep(1)
-                continue
-
-            if self.paused:
-                self.hide_hud_signal.emit()
-                time.sleep(1)
-                continue
-
+        with mss.mss() as sct:  # Context manager
             try:
-                screen_grab = np.array(sct.grab(monitor))
-                gray = cv2.cvtColor(screen_grab, cv2.COLOR_BGRA2GRAY)
-                
-                _, mask = cv2.threshold(gray, 140, 255, cv2.THRESH_BINARY)
-                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                detected = False
-                
-                for cnt in contours:
-                    x, y, w, h = cv2.boundingRect(cnt)
-                    if not (self.MIN_CONTOUR_WIDTH < w < self.MAX_CONTOUR_WIDTH 
-                            and self.MIN_CONTOUR_HEIGHT < h < self.MAX_CONTOUR_HEIGHT):
+                while self.running:
+                    # Pencere Kontrolü (Tesseract Modu İçin Ekledim)
+                    is_gta = self._is_gta_active()
+                    if is_gta != self.last_gta_state:
+                        self.last_gta_state = is_gta
+                        self.gta_window_active_signal.emit(is_gta)
+                    
+                    if not is_gta:
+                        self.hide_hud_signal.emit()
+                        time.sleep(1)
                         continue
-                    
-                    crop_w = w - 10 if w > 50 else w
-                    roi = gray[y:y+h, x:x+crop_w]
-                    
-                    roi_padded = self._preprocess_roi(roi)
-                    if roi_padded is None:
+
+                    if self.paused:
+                        self.hide_hud_signal.emit()
+                        time.sleep(1)
                         continue
-                    
-                    raw_text = self._extract_text_tesseract(roi_padded)
-                    clean = self._clean_text(raw_text) if raw_text else None
-                    if not clean:
-                        continue
-                    
-                    match_result = self._match_vehicle(clean)
-                    if match_result:
-                        match, score = match_result
-                        detected = True
-                        last_seen = time.time()
+
+                    try:
+                        screen_grab = np.array(sct.grab(monitor))
+                        gray = cv2.cvtColor(screen_grab, cv2.COLOR_BGRA2GRAY)
                         
-                        if match != last_matched:
-                            last_matched = match
-                            print(f"[OCR BULUNDU] {clean} -> {match} (Skor: {score})")
-                            self.vehicle_found_signal.emit(self.search_dict[match])
-                
-                if not detected and last_matched != "" and (time.time() - last_seen > self.HUD_TIMEOUT):
-                    self.hide_hud_signal.emit() 
-                    last_matched = ""
-            
-            except Exception as e:
-                print(f"[HATA] OCR Döngüsü Hatası: {e}")
+                        _, mask = cv2.threshold(gray, 140, 255, cv2.THRESH_BINARY)
+                        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        detected = False
+                        
+                        for cnt in contours:
+                            x, y, w, h = cv2.boundingRect(cnt)
+                            if not (self.MIN_CONTOUR_WIDTH < w < self.MAX_CONTOUR_WIDTH 
+                                    and self.MIN_CONTOUR_HEIGHT < h < self.MAX_CONTOUR_HEIGHT):
+                                continue
+                            
+                            crop_w = w - 10 if w > 50 else w
+                            roi = gray[y:y+h, x:x+crop_w]
+                            
+                            roi_padded = self._preprocess_roi(roi)
+                            if roi_padded is None:
+                                continue
+                            
+                            raw_text = self._extract_text_tesseract(roi_padded)
+                            clean = self._clean_text(raw_text) if raw_text else None
+                            if not clean:
+                                continue
+                            
+                            match_result = self._match_vehicle(clean)
+                            if match_result:
+                                match, score = match_result
+                                detected = True
+                                last_seen = time.time()
+                                
+                                if match != last_matched:
+                                    last_matched = match
+                                    print(f"[OCR BULUNDU] {clean} -> {match} (Skor: {score})")
+                                    self.vehicle_found_signal.emit(self.search_dict[match])
+                        
+                        if not detected and last_matched != "" and (time.time() - last_seen > self.HUD_TIMEOUT):
+                            self.hide_hud_signal.emit() 
+                            last_matched = ""
+                    
+                    except Exception as e:
+                        print(f"[HATA] OCR Döngüsü Hatası: {e}")
+                        self.hide_hud_signal.emit()
+                        last_matched = ""
+                        time.sleep(1)
+                    
+                    time.sleep(0.5)
+            finally:
+                # Cleanup
                 self.hide_hud_signal.emit()
-                last_matched = ""
-                time.sleep(1)
-            
-            time.sleep(0.5)
