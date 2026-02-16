@@ -613,7 +613,15 @@ class GalleryWindow(QWidget):
         self.setTabOrder(self.armor_check, self.weapon_check)
         
         self.update_tab_buttons()
-        self.apply_filters() 
+        # İlk apply_filters'i geciktir - widget'lar tam render olmadan width() yanlış değer döner
+        QTimer.singleShot(100, self.apply_filters)
+
+    def showEvent(self, event):
+        """Pencere gösterildiğinde grid layout'u düzelt"""
+        super().showEvent(event)
+        # İlk gösterimde widget boyutları doğru hesaplanması için load_page'i tekrar çağır
+        if hasattr(self, "grid_layout"):
+            QTimer.singleShot(50, self.load_page) 
 
     def mousePressEvent(self, event):
         # Sadece sol tuş ile resize/drag
@@ -627,9 +635,9 @@ class GalleryWindow(QWidget):
         self.resizer.handle_mouse_move(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.resizer.handle_mouse_release(event)
-        else:
+        # Her zaman resizer'ı bilgilendir (flag temizleme için)
+        self.resizer.handle_mouse_release(event)
+        if event.button() != Qt.LeftButton:
             super().mouseReleaseEvent(event)
 
     def resizeEvent(self, event):
@@ -2452,9 +2460,9 @@ class SettingsWindow(QWidget):
         self.resizer.handle_mouse_move(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.resizer.handle_mouse_release(event)
-        else:
+        # Her zaman resizer'ı bilgilendir (flag temizleme için)
+        self.resizer.handle_mouse_release(event)
+        if event.button() != Qt.LeftButton:
             super().mouseReleaseEvent(event)
 
     def closeEvent(self, event):

@@ -350,9 +350,9 @@ class LauncherWindow(QMainWindow):
         self.resizer.handle_mouse_move(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.resizer.handle_mouse_release(event)
-        else:
+        # Her zaman resizer'ı bilgilendir (flag temizleme için)
+        self.resizer.handle_mouse_release(event)
+        if event.button() != Qt.LeftButton:
             super().mouseReleaseEvent(event)
     
     # Title bar drag metodları

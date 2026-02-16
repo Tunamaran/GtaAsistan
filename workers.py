@@ -32,7 +32,7 @@ try:
     _test_loop.close()
     OCR_ENGINE = "winocr"
     print("[OCR] ✅ Windows OCR motoru aktif (hızlı mod)")
-except Exception:
+except (ImportError, RuntimeError, OSError, AttributeError) as e:
     try:
         import pytesseract
         _tess_path = cfg.get(
@@ -40,8 +40,12 @@ except Exception:
         )
         pytesseract.pytesseract.tesseract_cmd = _tess_path
         OCR_ENGINE = "tesseract"
-        print("[OCR] ⚠️ Windows OCR dil paketi bulunamadı, Tesseract kullanılıyor.")
-        print('[OCR] 💡 Hızlı OCR: Yönetici PS → Add-WindowsCapability -Online -Name "Language.OCR~~~en-US~0.0.1.0"')
+        print("[OCR] ⚠️ Windows OCR yüklenemedi, Tesseract kullanılıyor.")
+        print(f"[OCR] Hata detayı: {type(e).__name__}")
+        if isinstance(e, OSError):
+            print('[OCR] 💡 Windows OCR dil paketi: Ayarlar → Zaman ve Dil → Dil → İngilizce ekle')
+        elif isinstance(e, (ImportError, ModuleNotFoundError)):
+            print('[OCR] 💡 WinRT paketi: pip install winrt-Windows.Media.Ocr')
     except ImportError:
         print("[OCR] ❌ HATA: Ne Windows OCR ne Tesseract bulunamadı!")
 
