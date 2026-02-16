@@ -273,18 +273,7 @@ class LauncherWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Pencere kapandığında boyut ve konumu kaydet."""
-        # Geometry kaydet
-        cfg = config.load_config()
-        if "ui_geometry" not in cfg: cfg["ui_geometry"] = {}
-        
-        geom = self.geometry()
-        cfg["ui_geometry"]["LauncherWindow"] = {
-            "width": geom.width(),
-            "height": geom.height(),
-            "x": geom.x(),
-            "y": geom.y()
-        }
-        config.save_config(cfg)
+        self._save_geometry()
         
         # Autopilot kontrolü
         if self.autopilot_chk.isChecked():
@@ -298,6 +287,26 @@ class LauncherWindow(QMainWindow):
             )
         else:
             self.quit_app()
+    
+    def hideEvent(self, event):
+        """Pencere gizlendiğinde de boyut ve konumu kaydet."""
+        self._save_geometry()
+        super().hideEvent(event)
+    
+    def _save_geometry(self):
+        """Pencere geometrisini config'e kaydet."""
+        cfg = config.load_config()
+        if "ui_geometry" not in cfg: 
+            cfg["ui_geometry"] = {}
+        
+        geom = self.geometry()
+        cfg["ui_geometry"]["LauncherWindow"] = {
+            "width": geom.width(),
+            "height": geom.height(),
+            "x": geom.x(),
+            "y": geom.y()
+        }
+        config.save_config(cfg)
 
     def mousePressEvent(self, event):
         self.resizer.handle_mouse_press(event)

@@ -596,8 +596,19 @@ class GalleryWindow(QWidget):
 
     def closeEvent(self, event):
         """Pencere kapandığında boyut ve konumu kaydet."""
+        self._save_geometry()
+        super().closeEvent(event)
+    
+    def hideEvent(self, event):
+        """Pencere gizlendiğinde de boyut ve konumu kaydet."""
+        self._save_geometry()
+        super().hideEvent(event)
+    
+    def _save_geometry(self):
+        """Pencere geometrisini config'e kaydet."""
         cfg = load_config()
-        if "ui_geometry" not in cfg: cfg["ui_geometry"] = {}
+        if "ui_geometry" not in cfg: 
+            cfg["ui_geometry"] = {}
         
         geom = self.geometry()
         cfg["ui_geometry"]["GalleryWindow"] = {
@@ -607,7 +618,6 @@ class GalleryWindow(QWidget):
             "y": geom.y()
         }
         save_config(cfg)
-        super().closeEvent(event)
 
 
 
@@ -2362,8 +2372,21 @@ class SettingsWindow(QWidget):
 
     def closeEvent(self, event):
         """Pencere kapandığında boyut ve konumu kaydet."""
+        self._save_geometry()
+        if self.parent_window:
+            self.parent_window.show()
+        super().closeEvent(event)
+    
+    def hideEvent(self, event):
+        """Pencere gizlendiğinde de boyut ve konumu kaydet."""
+        self._save_geometry()
+        super().hideEvent(event)
+    
+    def _save_geometry(self):
+        """Pencere geometrisini config'e kaydet."""
         cfg = load_config()
-        if "ui_geometry" not in cfg: cfg["ui_geometry"] = {}
+        if "ui_geometry" not in cfg: 
+            cfg["ui_geometry"] = {}
         
         geom = self.geometry()
         cfg["ui_geometry"]["SettingsWindow"] = {
@@ -2373,10 +2396,6 @@ class SettingsWindow(QWidget):
             "y": geom.y()
         }
         save_config(cfg)
-        
-        if self.parent_window:
-            self.parent_window.show()
-        super().closeEvent(event)
 
 
 
