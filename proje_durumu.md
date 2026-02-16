@@ -149,10 +149,17 @@
 - [x] **[NEW]** Windows OCR dil paketi otomatik kurulum (admin yetkisi ile)
 - [x] **[NEW]** Python paket otomatik kurulumu (pip install winocr)
 - [x] **[NEW]** config.json otomatik oluşturma (tesseract_path dahil)
-- [x] **[NEW]** Python kontrolü (installer açılışta python --version)
+- [x] **[NEW]** Python kontrolü (installer açılışta python --version) ❌ KALDIRILDI
 - [x] **[NEW]** Frozen mod tesseract path desteği (_get_default_tesseract_path)
 - [x] **[DOC]** INSTALL.md: Kapsamlı kullanıcı ve geliştirici kılavuzu
 - [x] **[DOC]** Build süreci dokümantasyonu (Tesseract hazırlık adımları)
+
+### 🎯 Standalone Installer (Commit: a879df9)
+- [x] **[FIX]** Python kontrolü kaldırıldı (InitializeSetup fonksiyonu silindi)
+- [x] **[FIX]** Hiçbir önkoşul kontrolü yok (tam standalone)
+- [x] **[NEW]** README.md: GitHub kullanıcı dostu dokümantasyon
+- [x] **[DOC]** INSTALL.md güncellendi ("Python gerekli değil" notu)
+- [x] **[NEW]** .gitignore: tesseract_portable/ ve tesseract_setup.exe eklendi
 
 ## Yapılacaklar / Geliştirme Önerileri
 - [ ] Farklı ekran çözünürlükleri için otomatik ölçeklendirme.
