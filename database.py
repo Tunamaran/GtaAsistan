@@ -6,9 +6,10 @@ import os
 import tempfile
 import threading
 from typing import Optional, Tuple, List, Dict
+from config import APP_DIR
 
 # === Garaj Sistemi ===
-GARAGE_FILE = "garajim.json"
+GARAGE_FILE = os.path.join(APP_DIR, "garajim.json")
 
 # Basit dosya cache (Tekrar tekrar disk okumasını önler)
 _garage_cache: Optional[List[str]] = None
@@ -120,7 +121,7 @@ def get_garage_stats(db_data: List[Dict]) -> Tuple[int, str]:
 def load_vehicle_database() -> Tuple[Dict, List[Dict]]:
     """Ana araç veritabanını yükler."""
     try:
-        with open("gta_tum_araclar.json", "r", encoding="utf-8") as f:
+        with open(os.path.join(APP_DIR, "gta_tum_araclar.json"), "r", encoding="utf-8") as f:
             db_data = json.load(f)
             search_dict = {} 
             for car in db_data:

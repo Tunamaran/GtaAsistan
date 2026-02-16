@@ -2,11 +2,19 @@
 """Uygulama yapılandırma yönetimi."""
 import json
 import os
+import sys
 import copy
 import tempfile
 from typing import Dict, Any
 
-CONFIG_FILE = "config.json"
+def get_app_dir() -> str:
+    """PyInstaller frozen mod ve normal mod için uygulama dizinini döndürür."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+APP_DIR = get_app_dir()
+CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 
 import ctypes
 

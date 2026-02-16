@@ -2,6 +2,7 @@ import sys
 import os
 import subprocess
 import json
+from config import APP_DIR
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QTabWidget, 
                              QTextEdit, QLineEdit, QFormLayout, QGroupBox, 
@@ -712,18 +713,23 @@ class LauncherWindow(QMainWindow):
 
     def toggle_startup(self, checked):
         startup_path = os.path.join(os.getenv('APPDATA'), r'Microsoft\Windows\Start Menu\Programs\Startup', 'GTA_Asistan_Launcher.lnk')
-        target = os.path.abspath("launcher.py") # or python executable with argument
-        python_exe = sys.executable
-        # Shortcut Target: pythonw.exe (no console) launcher.py
-        # But we are running python.exe.
-        # Ideally launch 'pythonw.exe launcher.py'
         
-        pythonw = python_exe.replace("python.exe", "pythonw.exe")
-        if not os.path.exists(pythonw): pythonw = python_exe
+        if getattr(sys, 'frozen', False):
+            target_exe = os.path.join(APP_DIR, "launcher.exe")
+            working_dir = APP_DIR
+        else:
+            python_exe = sys.executable
+            pythonw = python_exe.replace("python.exe", "pythonw.exe")
+            if not os.path.exists(pythonw): pythonw = python_exe
+            target_exe = pythonw
+            working_dir = APP_DIR
         
         if checked:
-            # PowerShell ile kısayol oluştur
-            cmd = f'$s=(New-Object -COM WScript.Shell).CreateShortcut("{startup_path}");$s.TargetPath="{pythonw}";$s.Arguments="{target}";$s.WorkingDirectory="{os.getcwd()}";$s.Save()'
+            if getattr(sys, 'frozen', False):
+                cmd = f'$s=(New-Object -COM WScript.Shell).CreateShortcut("{startup_path}");$s.TargetPath="{target_exe}";$s.WorkingDirectory="{working_dir}";$s.Save()'
+            else:
+                launcher_path = os.path.join(APP_DIR, "launcher.py")
+                cmd = f'$s=(New-Object -COM WScript.Shell).CreateShortcut("{startup_path}");$s.TargetPath="{target_exe}";$s.Arguments="{launcher_path}";$s.WorkingDirectory="{working_dir}";$s.Save()'
             subprocess.run(["powershell", "-Command", cmd], capture_output=True)
             QMessageBox.information(self, "Bilgi", "Windows başlangıcına eklendi.")
         else:
@@ -732,7 +738,7 @@ class LauncherWindow(QMainWindow):
                 QMessageBox.information(self, "Bilgi", "Windows başlangıcından kaldırıldı.")
 
     def check_status(self):
-        db_file = "gta_tum_araclar.json"
+        db_file = os.path.join(APP_DIR, "gta_tum_araclar.json")
         if os.path.exists(db_file):
             try:
                 with open(db_file, "r", encoding="utf-8") as f:
@@ -925,8 +931,11 @@ class LauncherWindow(QMainWindow):
              return
 
         try:
-            # Asistanı (main.py) başlat
-            proc = subprocess.Popen([sys.executable, "main.py"], cwd=os.getcwd())
+            if getattr(sys, 'frozen', False):
+                main_exe = os.path.join(APP_DIR, "main.exe")
+                proc = subprocess.Popen([main_exe], cwd=APP_DIR)
+            else:
+                proc = subprocess.Popen([sys.executable, "main.py"], cwd=APP_DIR)
             
             # Eğer Auto-Pilot aktifse süreci takip et (yönet)
             if self.autopilot_chk.isChecked():

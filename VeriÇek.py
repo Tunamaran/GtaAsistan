@@ -6,13 +6,14 @@ import time
 import random
 import warnings
 import os
+from config import APP_DIR
 
 # --- UYARILARI GİZLE ---
 from bs4 import XMLParsedAsHTMLWarning
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 # --- AYARLAR ---
-OUTPUT_FILE = "gta_tum_araclar.json"
+OUTPUT_FILE = os.path.join(APP_DIR, "gta_tum_araclar.json")
 SITEMAP_URL = "https://www.gtabase.com/sitemap-4seo.xml"
 BASE_VEHICLE_URL = "https://www.gtabase.com/grand-theft-auto-v/vehicles/"
 

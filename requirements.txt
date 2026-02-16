@@ -1,0 +1,14 @@
+PyQt5>=5.15
+opencv-python>=4.8
+numpy>=1.24
+mss>=9.0
+keyboard>=0.13
+thefuzz>=0.20
+requests>=2.31
+winocr>=0.0.15
+Pillow>=10.0
+pytesseract>=0.3.10
+cloudscraper>=1.2.71
+beautifulsoup4>=4.12
+lxml>=5.0
+pyinstaller>=6.0
