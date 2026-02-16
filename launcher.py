@@ -933,9 +933,33 @@ class LauncherWindow(QMainWindow):
         try:
             if getattr(sys, 'frozen', False):
                 main_exe = os.path.join(APP_DIR, "main.exe")
-                proc = subprocess.Popen([main_exe], cwd=APP_DIR)
+                proc = subprocess.Popen([main_exe], cwd=APP_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
-                proc = subprocess.Popen([sys.executable, "main.py"], cwd=APP_DIR)
+                proc = subprocess.Popen([sys.executable, "main.py"], cwd=APP_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Kısa bir süre bekle ve hata kontrolü yap
+            import time
+            time.sleep(0.3)
+            exit_code = proc.poll()
+            
+            if exit_code is not None:
+                # Process crash oldu veya hemen kapandı
+                stdout, stderr = proc.communicate(timeout=1)
+                error_msg = stderr.decode('utf-8', errors='ignore') if stderr else ""
+                
+                if "OCR" in error_msg and "bulunamadı" in error_msg:
+                    QMessageBox.critical(self, "OCR Hatası", 
+                        "Hiçbir OCR motoru bulunamadı!\n\n"
+                        "Çözüm 1: Windows OCR (Önerilen)\n"
+                        "  • Ayarlar → Zaman ve Dil → Dil → İngilizce (US) ekle\n"
+                        "  • Terminal: pip install winocr\n\n"
+                        "Çözüm 2: Tesseract OCR\n"
+                        "  • İndir: https://github.com/UB-Mannheim/tesseract/wiki\n"
+                        "  • Kur: C:\\Program Files\\Tesseract-OCR\n"
+                        "  • Terminal: pip install pytesseract")
+                else:
+                    QMessageBox.critical(self, "Hata", f"Asistan başlatılamadı (exit code: {exit_code})\n\n{error_msg[:500]}")
+                return
             
             # Eğer Auto-Pilot aktifse süreci takip et (yönet)
             if self.autopilot_chk.isChecked():

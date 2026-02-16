@@ -32,7 +32,16 @@ try:
     _test_loop.close()
     OCR_ENGINE = "winocr"
     print("[OCR] ✅ Windows OCR motoru aktif (hızlı mod)")
-except (ImportError, RuntimeError, OSError, AttributeError) as e:
+except (ImportError, RuntimeError, OSError, AttributeError, AssertionError) as e:
+    print("[OCR] ⚠️ Windows OCR yüklenemedi, Tesseract kullanılıyor.")
+    print(f"[OCR] Hata detayı: {type(e).__name__}")
+    if isinstance(e, (OSError, AssertionError)):
+        print('[OCR] 💡 Windows OCR dil paketi eksik!')
+        print('[OCR] 💡 Çözüm: Ayarlar → Zaman ve Dil → Dil → İngilizce (US) ekle')
+        print('[OCR]        veya PowerShell (Yönetici): Add-WindowsCapability -Online -Name "Language.OCR~~~en-US~0.0.1.0"')
+    elif isinstance(e, (ImportError, ModuleNotFoundError)):
+        print('[OCR] 💡 WinRT paketi: pip install winocr')
+    
     try:
         import pytesseract
         _tess_path = cfg.get(
@@ -40,14 +49,22 @@ except (ImportError, RuntimeError, OSError, AttributeError) as e:
         )
         pytesseract.pytesseract.tesseract_cmd = _tess_path
         OCR_ENGINE = "tesseract"
-        print("[OCR] ⚠️ Windows OCR yüklenemedi, Tesseract kullanılıyor.")
-        print(f"[OCR] Hata detayı: {type(e).__name__}")
-        if isinstance(e, OSError):
-            print('[OCR] 💡 Windows OCR dil paketi: Ayarlar → Zaman ve Dil → Dil → İngilizce ekle')
-        elif isinstance(e, (ImportError, ModuleNotFoundError)):
-            print('[OCR] 💡 WinRT paketi: pip install winrt-Windows.Media.Ocr')
+        print("[OCR] ℹ️ Tesseract OCR kullanılıyor.")
     except ImportError:
-        print("[OCR] ❌ HATA: Ne Windows OCR ne Tesseract bulunamadı!")
+        print("\n" + "="*60)
+        print("[OCR] ❌ HATA: Hiçbir OCR motoru bulunamadı!")
+        print("="*60)
+        print("Çözüm 1: Windows OCR (Önerilen - Hızlı)")
+        print("  • pip install winocr")
+        print("  • Windows Ayarları → Zaman ve Dil → Dil → İngilizce (US) ekle")
+        print("")
+        print("Çözüm 2: Tesseract OCR")
+        print("  • İndir: https://github.com/UB-Mannheim/tesseract/wiki")
+        print("  • Kur: C:\\Program Files\\Tesseract-OCR")
+        print("  • pip install pytesseract")
+        print("="*60 + "\n")
+        import sys
+        sys.exit(1)
 
 
 class HotkeyThread(QThread):
