@@ -24,7 +24,7 @@ Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "installwinrt"; Description: "Windows OCR dil paketi kur (Internet gerekli)"; Flags: checked
+Name: "installwinrt"; Description: "Windows OCR dil paketi kur (Internet gerekli)"
 
 [Files]
 Source: "dist\GtaAsistan\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
