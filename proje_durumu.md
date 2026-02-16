@@ -127,6 +127,23 @@
 - [x] **[CHORE]** Python cache temizliği (__pycache__, *.pyc git'ten kaldırıldı) <!-- Commit: 2b36932 -->
 - [x] **[CHORE]** .gitignore güncellendi (Python bytecode dosyaları eklendi)
 
+### 📦 Profesyonel Kurulum Sistemi (Commit: effda7c)
+- [x] **[NEW]** PyInstaller ile tek dosya executable (launcher.exe + main.exe)
+- [x] **[NEW]** Inno Setup installer (GtaAsistan_Setup_v1.0.0.exe, ~72MB)
+- [x] **[NEW]** Frozen mod desteği (sys.frozen, APP_DIR, mutlak dosya yolları)
+- [x] **[NEW]** build.bat: Tek komutla derleme + installer oluşturma
+- [x] **[NEW]** Türkçe/İngilizce installer UI
+- [x] **[NEW]** Otomatik uninstaller (Program Ekle/Kaldır desteği)
+- [x] **[NEW]** Masaüstü kısayolu ve Windows başlangıç seçenekleri
+- [x] **[NEW]** requirements.txt: Tüm bağımlılıklar listelendi
+
+### 🛡️ OCR Hata Yönetimi (Commit: 98443bd)
+- [x] **[FIX]** Windows OCR dil paketi eksikliğinde graceful fallback
+- [x] **[FIX]** AssertionError exception handling (winocr başlatma hatası)
+- [x] **[FIX]** Launcher'da subprocess exit code kontrolü (300ms crash detection)
+- [x] **[UX]** OCR hatası GUI popup ile bildirim (çözüm adımları dahil)
+- [x] **[UX]** Detaylı hata mesajları (dil paketi eksik, Tesseract yok, vs.)
+
 ## Yapılacaklar / Geliştirme Önerileri
 - [ ] Farklı ekran çözünürlükleri için otomatik ölçeklendirme.
 - [ ] Performans optimizasyonu (OCR işlem yükünü azaltma).
