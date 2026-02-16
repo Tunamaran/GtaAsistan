@@ -88,6 +88,45 @@
 - [x] Dinamik Boyutlandırma: Tüm pencerelerin fare ile kenarlardan büyütülüp küçültülebilmesi ve Galeri grid düzeninin buna göre uyum sağlaması. <!-- id: 5 -->
 - [x] Pencere Hafızası: Galeri, Ayarlar ve Launcher pencerelerinin son boyutlarını ve konumlarını hatırlaması. <!-- id: 6 -->
 
+### 🔧 Kritik Stabilite Düzeltmeleri (Commit: 9588ca6)
+- [x] **[FIX]** VeriÇek.py eksik fonksiyonlar eklendi (`get_vehicle_details`, `save_data`) 
+- [x] **[FIX]** ImageLoaderThread memory leak düzeltildi (thread lifecycle yönetimi)
+- [x] **[FIX]** Atomik yazma pattern'i uygulandı (tempfile + os.replace) - veri kaybı koruması
+- [x] **[FIX]** QPixmap thread safety düzeltildi (worker thread'de QImage kullanımı)
+- [x] **[FIX]** Garaj veritabanı race condition koruması (threading.Lock eklendi)
+- [x] **[FIX]** HotkeyThread proper cleanup implementasyonu (keyboard.unhook_all)
+- [x] **[FIX]** OCR resource leak düzeltildi (mss context manager, try-finally)
+- [x] **[FIX]** Image cache LRU limiti eklendi (max 200 öğe, memory kontrolü)
+- [x] **[FIX]** FramelessResizer kod duplikasyonu kaldırıldı (ui_utils.py ortak modül)
+
+### 🎨 UI/UX İyileştirmeleri ve Erişilebilirlik (Commit: 49e8d10)
+- [x] **[A11Y]** Klavye navigasyonu desteği (Tab order, Enter/Space aktivasyonu)
+- [x] **[A11Y]** Tooltip ve accessible name'ler eklendi (WCAG 2.1 uyumlu)
+- [x] **[A11Y]** Renk kontrastı düzeltildi (TEXT_SECONDARY: #B2BEC3, 8.5:1 kontrast)
+- [x] **[UX]** Form validasyon feedback (hatalı alan vurgulama, cursor yönlendirme)
+- [x] **[UX]** Theme System (Design Tokens: PRIMARY, BACKGROUND, SURFACE renkleri)
+- [x] **[UX]** Layout sabitleri (CARD_WIDTH, SPACING_MEDIUM) ve Typography sistemi
+- [x] **[PERF]** ScrollingLabel animation optimization (global AnimationManager)
+- [x] **[UX]** Gelişmiş sayfalama (İlk/Son sayfa, sayfa input, go_to_page metodu)
+- [x] **[UX]** Araç kartlarına sağ tık menüsü (Garaja Ekle/Çıkar, Detayları Gör)
+- [x] **[UX]** "Filtreleri Temizle" butonu eklendi
+
+### 🪟 Pencere Yönetimi İyileştirmeleri
+- [x] **[FIX]** Launcher minimize/close butonları eklendi (custom title bar, 35px) <!-- Commit: 86fc3c3 -->
+- [x] **[FIX]** Pencere boyutları hatırlama sistemi (hideEvent + closeEvent) <!-- Commit: d802b32 -->
+- [x] **[FIX]** Galeri resize düzeltmesi (SettingsWindow yaklaşımı uygulandı) <!-- Commit: 4f17fb0, 4e4e0a1 -->
+- [x] **[FIX]** Dinamik pencere boyut limitleri (ekranın %90'ı max, multi-monitor desteği) <!-- Commit: 0d56cee -->
+- [x] **[FIX]** Mouse button kontrolü (sadece sol tuş ile resize/drag) <!-- Commit: 011a0c4 -->
+
+### 🐛 Kritik UI Hataları Düzeltildi (Commit: 089bea2)
+- [x] **[FIX]** Windows OCR exception handling iyileştirildi (spesifik hata tipleri, detaylı mesajlar)
+- [x] **[FIX]** Pencere fareyi kendi kendine takip etme sorunu (mouseReleaseEvent flag temizleme)
+- [x] **[FIX]** Galeri ilk açılışta tek sütun sorunu (QTimer.singleShot + showEvent timing fix)
+
+### 🧹 Kod Kalitesi ve Bakım
+- [x] **[CHORE]** Python cache temizliği (__pycache__, *.pyc git'ten kaldırıldı) <!-- Commit: 2b36932 -->
+- [x] **[CHORE]** .gitignore güncellendi (Python bytecode dosyaları eklendi)
+
 ## Yapılacaklar / Geliştirme Önerileri
 - [ ] Farklı ekran çözünürlükleri için otomatik ölçeklendirme.
 - [ ] Performans optimizasyonu (OCR işlem yükünü azaltma).
