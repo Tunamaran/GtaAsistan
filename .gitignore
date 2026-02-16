@@ -9,6 +9,8 @@ dist/
 build/
 Output/
 *.log
+tesseract_portable/
+tesseract_setup.exe
 
 # Environment files
 .env

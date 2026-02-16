@@ -45,25 +45,6 @@ Type: filesandordirs; Name: "{app}\__pycache__"
 Type: dirifempty; Name: "{app}"
 
 [Code]
-function InitializeSetup(): Boolean;
-var
-  ResultCode: Integer;
-begin
-  Result := True;
-  
-  // Python kontrolu
-  if Exec('cmd.exe', '/C python --version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-  begin
-    if ResultCode <> 0 then
-    begin
-      MsgBox('Python bulunamadi! GTA Asistan calismak icin Python gerektirir.' + #13#10 + 
-             'Lutfen https://www.python.org adresinden Python 3.8+ yukleyin.', 
-             mbError, MB_OK);
-      Result := False;
-    end;
-  end;
-end;
-
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
@@ -78,7 +59,7 @@ begin
         False);
     end;
     
-    // pip install winocr
+    // pip install winocr (opsiyonel - basarisiz olsa da devam et)
     Exec('cmd.exe', '/C pip install winocr', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;

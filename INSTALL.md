@@ -22,8 +22,9 @@ GtaAsistan_Setup_v1.0.0.exe
 
 ### Sistem Gereksinimleri
 - **Windows 10/11** (64-bit)
-- **Python 3.8+** (otomatik kontrol edilir)
-- **Internet bağlantısı** (Windows OCR kurulumu için)
+- **Internet bağlantısı** (opsiyonel - Windows OCR kurulumu için)
+
+> **Not:** Python yüklemenize gerek yok! PyInstaller ile oluşturulan exe'ler Python runtime'ı içerir (standalone).
 
 ### Kaldırma
 ```
@@ -98,17 +99,12 @@ Output\
 
 ### Sorun Giderme
 
-**Problem: "Tesseract portable bulunamadı"**
+**Problem: "Tesseract portable bulunamadı" (Build sırasında)**
 ```
 Çözüm: tesseract_portable\tesseract.exe dosyasının olduğunu doğrula
 ```
 
-**Problem: "Python bulunamadı" (Installer sırasında)**
-```
-Çözüm: Python 3.8+ yükle ve PATH'e ekle
-```
-
-**Problem: "Inno Setup bulunamadı"**
+**Problem: "Inno Setup bulunamadı" (Build sırasında)**
 ```
 Çözüm: Inno Setup 6 kur veya manuel olarak:
 "C:\Users\[KULLANICI]\AppData\Local\Programs\Inno Setup 6\iscc.exe" installer.iss
