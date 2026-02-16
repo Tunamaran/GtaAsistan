@@ -3,6 +3,7 @@
 import time
 import re
 import asyncio
+import logging
 from typing import Dict, List, Optional, Tuple
 
 import requests
@@ -20,51 +21,48 @@ from config import load_config
 cfg = load_config()
 
 # === OCR Motor Seçimi ===
-OCR_ENGINE = "tesseract"
+LCD = None  # Lazy Loaded
+OCR_ENGINE = None
 
-try:
-    import winocr
-    from PIL import Image as PILImage
+def get_ocr_engine():
+    global OCR_ENGINE
+    if OCR_ENGINE is not None:
+        return OCR_ENGINE
     
-    _test_loop = asyncio.new_event_loop()
-    _test_img = PILImage.new('L', (50, 20), 255)
-    _test_loop.run_until_complete(winocr.recognize_pil(_test_img, lang='en'))
-    _test_loop.close()
-    OCR_ENGINE = "winocr"
-    print("[OCR] ✅ Windows OCR motoru aktif (hızlı mod)")
-except (ImportError, RuntimeError, OSError, AttributeError, AssertionError) as e:
-    print("[OCR] ⚠️ Windows OCR yüklenemedi, Tesseract kullanılıyor.")
-    print(f"[OCR] Hata detayı: {type(e).__name__}")
-    if isinstance(e, (OSError, AssertionError)):
-        print('[OCR] 💡 Windows OCR dil paketi eksik!')
-        print('[OCR] 💡 Çözüm: Ayarlar → Zaman ve Dil → Dil → İngilizce (US) ekle')
-        print('[OCR]        veya PowerShell (Yönetici): Add-WindowsCapability -Online -Name "Language.OCR~~~en-US~0.0.1.0"')
-    elif isinstance(e, (ImportError, ModuleNotFoundError)):
-        print('[OCR] 💡 WinRT paketi: pip install winocr')
-    
+    logging.info("OCR Motoru başlatılıyor...")
     try:
-        import pytesseract
-        _tess_path = cfg.get(
-            "tesseract_path", r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-        )
-        pytesseract.pytesseract.tesseract_cmd = _tess_path
-        OCR_ENGINE = "tesseract"
-        print("[OCR] ℹ️ Tesseract OCR kullanılıyor.")
-    except ImportError:
-        print("\n" + "="*60)
-        print("[OCR] ❌ HATA: Hiçbir OCR motoru bulunamadı!")
-        print("="*60)
-        print("Çözüm 1: Windows OCR (Önerilen - Hızlı)")
-        print("  • pip install winocr")
-        print("  • Windows Ayarları → Zaman ve Dil → Dil → İngilizce (US) ekle")
-        print("")
-        print("Çözüm 2: Tesseract OCR")
-        print("  • İndir: https://github.com/UB-Mannheim/tesseract/wiki")
-        print("  • Kur: C:\\Program Files\\Tesseract-OCR")
-        print("  • pip install pytesseract")
-        print("="*60 + "\n")
-        import sys
-        sys.exit(1)
+        import winocr
+        from PIL import Image as PILImage
+        
+        # Testi burada yap, import anında değil
+        try:
+            _test_loop = asyncio.new_event_loop()
+            _test_img = PILImage.new('L', (50, 20), 255)
+            _test_loop.run_until_complete(winocr.recognize_pil(_test_img, lang='en'))
+            _test_loop.close()
+            OCR_ENGINE = "winocr"
+            logging.info("[OCR] Windows OCR motoru aktif (hızlı mod)")
+            print("[OCR] [OK] Windows OCR motoru aktif (hızlı mod)")
+        except Exception as e:
+            logging.warning(f"[OCR] Windows OCR testi başarısız: {e}")
+            raise e
+
+    except (ImportError, RuntimeError, OSError, AttributeError, AssertionError) as e:
+        logging.warning(f"[OCR] Windows OCR kullanılamıyor, Tesseract aranıyor... Hata: {e}")
+        print("[OCR] [UYARI] Windows OCR yüklenemedi, Tesseract kullanılıyor.")
+        
+        try:
+            import pytesseract
+            _tess_path = cfg.get("tesseract_path", r'C:\Program Files\Tesseract-OCR\tesseract.exe')
+            pytesseract.pytesseract.tesseract_cmd = _tess_path
+            OCR_ENGINE = "tesseract"
+            logging.info("[OCR] Tesseract OCR kullanılıyor.")
+            print("[OCR] [BILGI] Tesseract OCR kullanılıyor.")
+        except ImportError:
+             logging.error("Hiçbir OCR motoru bulunamadı!")
+             OCR_ENGINE = "none" # Fail gracefully
+    
+    return OCR_ENGINE
 
 
 class HotkeyThread(QThread):
@@ -268,6 +266,8 @@ class OcrThread(QThread):
     # =====================================================
     def _run_winocr(self, gray: np.ndarray):  # -> List[OcrLine]
         """Windows OCR ile tüm ekranı tarar, satır nesnelerini döndürür."""
+        import winocr # Fonksiyon içinde import ederek global scope karmaşasından kaçınalım
+        from PIL import Image as PILImage
         try:
             pil_img = PILImage.fromarray(gray)
             result = self._loop.run_until_complete(
@@ -282,10 +282,13 @@ class OcrThread(QThread):
     # =====================================================
     def run(self) -> None:
         """Ana OCR döngüsü — motor tipine göre farklı yol izler."""
-        if OCR_ENGINE == "winocr":
+        engine = get_ocr_engine()
+        if engine == "winocr":
             self._run_winocr_loop()
-        else:
+        elif engine == "tesseract":
             self._run_tesseract_loop()
+        else:
+            logging.error("OCR Motoru başlatılamadığı için thread duruyor.")
 
     def _is_gta_active(self) -> bool:
         """Aktif pencerenin GTA 5 olup olmadığını kontrol eder."""
@@ -320,6 +323,7 @@ class OcrThread(QThread):
                     if is_gta != self.last_gta_state:
                         self.last_gta_state = is_gta
                         self.gta_window_active_signal.emit(is_gta)
+                        logging.debug(f"[DEBUG] GTA Penceresi Aktif: {is_gta}")
                     
                     if not is_gta:
                         self.hide_hud_signal.emit()
@@ -341,17 +345,24 @@ class OcrThread(QThread):
                         gray_2x = cv2.resize(gray, (w_orig*2, h_orig*2), interpolation=cv2.INTER_LINEAR)
                         
                         # 2. Windows OCR ile tüm satırları oku (Büyütülmüş resim ile)
+                        # 2. Windows OCR ile tüm satırları oku (Büyütülmüş resim ile)
                         lines = self._run_winocr(gray_2x)
+                        logging.debug(f"[DEBUG] Bulunan satır sayısı: {len(lines)}")
                         
                         candidates = []  # (araç_ismi, skor, parlaklık, ham_metin)
                         
-                        for line in lines:
+                        for line_idx, line in enumerate(lines):
                             raw_text = line.text.strip()
+                            if raw_text:
+                                logging.debug(f"[DEBUG] Satır {line_idx}: '{raw_text}'")
                             
                             # 3. Temizle
                             clean = self._clean_text(raw_text)
                             if not clean:
+                                logging.debug(f"[DEBUG] Temizleme sonrası boş: '{raw_text}'")
                                 continue
+                            
+                            logging.debug(f"[DEBUG] Temiz metin: '{clean}'")
                             
                             # 4. Eşleştir
                             match_result = self._match_vehicle(clean)
@@ -383,7 +394,10 @@ class OcrThread(QThread):
                         
                         # 6. En parlak (highlight olan) adayı seç
                         # YENİ: Sadece parlak (seçili) öğeleri dikkate al (Başlıkları ve seçili olmayanları eler)
+                        logging.debug(f"[DEBUG] Adaylar (Filtre Öncesi): {[(c[3], int(c[2])) for c in candidates]}")
                         candidates = [c for c in candidates if c[2] >= 100]
+                        if not candidates:
+                             logging.debug("[DEBUG] Parlaklık filtresinden geçen aday yok.")
                         
                         if candidates:
                             # Parlaklığa göre sırala (en yüksek en başa)

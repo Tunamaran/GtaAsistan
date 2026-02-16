@@ -17,6 +17,15 @@ a = Analysis(
         'VeriÇek',
         'PyQt5', 'PyQt5.QtWidgets', 'PyQt5.QtCore', 'PyQt5.QtGui',
         'cloudscraper', 'bs4', 'lxml',
+        # OCR ve Ekran Yakalama
+        'winocr', 
+        'winrt.windows.media.ocr',
+        'winrt.windows.graphics.imaging',
+        'winrt.windows.storage.streams',
+        'winrt.windows.globalization',
+        'winrt.windows.foundation',
+        'winrt.windows.foundation.collections',
+        'mss', 'cv2', 'numpy', 'PIL', 'keyboard', 'thefuzz',
     ],
     hookspath=[],
     hooksconfig={},
@@ -41,6 +50,7 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     icon='app_icon.ico',
+    uac_admin=True,
 )
 
 coll = COLLECT(

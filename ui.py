@@ -20,7 +20,8 @@ from PyQt5.QtGui import (
 # Proje Modülleri
 from config import load_config, save_config
 from database import get_smart_badges, get_vehicle_advice, parse_number, load_garage, get_garage_stats, toggle_vehicle_ownership
-from workers import ImageLoaderThread
+from workers import ImageLoaderThread, get_ocr_engine
+import logging
 
 # ==========================================
 # THEME & DESIGN SYSTEM
@@ -2298,27 +2299,31 @@ class SettingsWindow(QWidget):
 
         
         # 1. Kayıtlı Geometriyi Al veya Varsayılanı Hesapla
-        cfg = load_config()
-        geom = cfg.get("ui_geometry", {}).get("SettingsWindow", {})
-        
-        width_s = geom.get("width", 600)
-        height_s = geom.get("height", 900)
-        
-        screen = QApplication.primaryScreen().availableGeometry()
-        
-        # Ekran yüksekliğinden büyükse sığdır
-        if height_s > screen.height() - 40:
-             height_s = screen.height() - 40
-
-        self.setMinimumSize(400, 500)
-        self.resize(width_s, height_s)
-
-        if geom.get("x", -1) != -1:
-            self.move(geom["x"], geom["y"])
-        else:
-            left = screen.x() + (screen.width() - width_s) // 2
-            top = screen.y() + (screen.height() - height_s) // 2
-            self.move(left, top)
+        try:
+            cfg = load_config()
+            geom = cfg.get("ui_geometry", {}).get("SettingsWindow", {})
+            
+            width_s = geom.get("width", 600)
+            height_s = geom.get("height", 900)
+            
+            screen = QApplication.primaryScreen().availableGeometry()
+            
+            # Ekran yüksekliğinden büyükse sığdır
+            if height_s > screen.height() - 40:
+                 height_s = screen.height() - 40
+    
+            self.setMinimumSize(400, 500)
+            self.resize(width_s, height_s)
+    
+            if geom.get("x", -1) != -1:
+                self.move(geom["x"], geom["y"])
+            else:
+                left = screen.x() + (screen.width() - width_s) // 2
+                top = screen.y() + (screen.height() - height_s) // 2
+                self.move(left, top)
+        except Exception as e:
+            logging.error(f"SettingsWindow init geometry error: {e}")
+            self.resize(600, 800)
         
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -2349,8 +2354,9 @@ class SettingsWindow(QWidget):
         general_layout.setLabelAlignment(Qt.AlignLeft)
         
         # OCR Motor Bilgisi
-        from workers import OCR_ENGINE
-        if OCR_ENGINE == "winocr":
+        # OCR Motor Bilgisi
+        engine = get_ocr_engine()
+        if engine == "winocr":
             ocr_info = QLabel("✅ Windows OCR (yerleşik)")
             ocr_info.setStyleSheet("color: #00FF96; font-weight: bold;")
         else:

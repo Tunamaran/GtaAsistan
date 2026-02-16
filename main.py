@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt
 from database import load_vehicle_database, toggle_vehicle_ownership
 from workers import OcrThread, HotkeyThread
 from ui import OverlayHUD, GalleryWindow, StatusHUD
-from config import load_config
+from config import load_config, setup_logging
 from history import VehicleHistory
 
 
@@ -272,6 +272,12 @@ class JarvisApp:
 
 
 if __name__ == "__main__" or getattr(sys, 'frozen', False):
-    # Normal Python veya PyInstaller frozen mod (exe)
-    jarvis = JarvisApp()
-    jarvis.run()
+    setup_logging()
+    try:
+        # Normal Python veya PyInstaller frozen mod (exe)
+        jarvis = JarvisApp()
+        jarvis.run()
+    except Exception as e:
+        import logging
+        logging.critical(f"FATAL ERROR: {e}", exc_info=True)
+        # sys.exit(1)

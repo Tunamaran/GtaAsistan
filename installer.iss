@@ -36,25 +36,9 @@ Name: "{autodesktop}\GTA Asistan"; Filename: "{app}\launcher.exe"; IconFilename:
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""Add-WindowsCapability -Online -Name 'Language.OCR~~~en-US~0.0.1.0'"""; StatusMsg: "Windows OCR dil paketi kuruluyor..."; Flags: runhidden waituntilterminated; Tasks: installwinrt
-Filename: "{app}\launcher.exe"; Description: "GTA Asistan Baslat"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\launcher.exe"; Description: "GTA Asistan Baslat"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallDelete]
-Type: files; Name: "{app}\config.json"
-Type: files; Name: "{app}\garajim.json"
 Type: filesandordirs; Name: "{app}\__pycache__"
 Type: dirifempty; Name: "{app}"
 
-[Code]
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssPostInstall then
-  begin
-    // Config dosyasi olustur (Tesseract path ile)
-    if not FileExists(ExpandConstant('{app}\config.json')) then
-    begin
-      SaveStringToFile(ExpandConstant('{app}\config.json'), 
-        '{"tesseract_path": "' + ExpandConstant('{app}') + '\tesseract\tesseract.exe"}', 
-        False);
-    end;
-  end;
-end;

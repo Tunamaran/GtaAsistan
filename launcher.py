@@ -11,7 +11,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon, QColor
 import ctypes
+import ctypes
 import time
+import logging  # ADDDED LOGGING
 
 # Config modülünü yükle
 import config
@@ -283,13 +285,18 @@ class LauncherWindow(QMainWindow):
         self.resizer = FramelessResizer(self)
         
         # Config yükle
+        config.setup_logging() # LOGGING SETUP
         self.cfg = config.load_config()
         self.update_thread = None
         self.assistant_process = None
         
         # Auto-Pilot Thread
+        # if self.cfg.get("autopilot", False): # Artık varsayılan olarak kapalı kalsın
         self.autopilot_thread = AutoPilotThread()
         self.autopilot_thread.game_started.connect(self.on_game_started)
+        self.autopilot_thread.game_stopped.connect(self.on_game_stopped)
+        
+        logging.info("Launcher başlatıldı.")
         self.autopilot_thread.game_stopped.connect(self.on_game_stopped)
         
         # Tray Icon Kurulumu
@@ -708,34 +715,73 @@ class LauncherWindow(QMainWindow):
             self.tray_icon.showMessage("GTA Asistan", "Asistan kapandı, Launcher beklemede.", QSystemTrayIcon.Information, 2000)
 
     def check_startup_status(self):
-        startup_path = os.path.join(os.getenv('APPDATA'), r'Microsoft\Windows\Start Menu\Programs\Startup', 'GTA_Asistan_Launcher.lnk')
-        return os.path.exists(startup_path)
+        """Görev Zamanlayıcı'da görevin olup olmadığını kontrol eder."""
+        try:
+            # schtasks /query /tn "GTA Asistan Launcher"
+            # Hata kodu 0 ise görev var demektir.
+            subprocess.run(["schtasks", "/query", "/tn", "GTA Asistan Launcher"], 
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except subprocess.CalledProcessError:
+            return False
 
     def toggle_startup(self, checked):
-        startup_path = os.path.join(os.getenv('APPDATA'), r'Microsoft\Windows\Start Menu\Programs\Startup', 'GTA_Asistan_Launcher.lnk')
+        task_name = "GTA Asistan Launcher"
         
         if getattr(sys, 'frozen', False):
             target_exe = os.path.join(APP_DIR, "launcher.exe")
-            working_dir = APP_DIR
+            # Exe için tırnak içine al (boşluk varsa)
+            command = f'\\"{target_exe}\\"' 
         else:
+            # Geliştirme ortamı için
             python_exe = sys.executable
+            # pythonw kullan ki konsol açılmasın
             pythonw = python_exe.replace("python.exe", "pythonw.exe")
             if not os.path.exists(pythonw): pythonw = python_exe
-            target_exe = pythonw
-            working_dir = APP_DIR
-        
+            
+            launcher_script = os.path.join(APP_DIR, "launcher.py")
+            command = f'\\"{pythonw}\\" \\"{launcher_script}\\"'
+
         if checked:
-            if getattr(sys, 'frozen', False):
-                cmd = f'$s=(New-Object -COM WScript.Shell).CreateShortcut("{startup_path}");$s.TargetPath="{target_exe}";$s.WorkingDirectory="{working_dir}";$s.Save()'
-            else:
-                launcher_path = os.path.join(APP_DIR, "launcher.py")
-                cmd = f'$s=(New-Object -COM WScript.Shell).CreateShortcut("{startup_path}");$s.TargetPath="{target_exe}";$s.Arguments="{launcher_path}";$s.WorkingDirectory="{working_dir}";$s.Save()'
-            subprocess.run(["powershell", "-Command", cmd], capture_output=True)
-            QMessageBox.information(self, "Bilgi", "Windows başlangıcına eklendi.")
+            try:
+                # Görev Zamanlayıcı'ya ekle (Yüksek Ayrıcalıklarla - /rl highest)
+                # /sc onlogon: Kullanıcı giriş yaptığında
+                # /f: Varsa üzerine yaz
+                args = [
+                    "schtasks", "/create", "/tn", task_name,
+                    "/tr", command,
+                    "/sc", "onlogon",
+                    "/rl", "highest",
+                    "/f"
+                ]
+                
+                # subprocess ile çalıştır (zaten admin yetkisi olduğu varsayılır)
+                subprocess.run(args, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                
+                # Eski kısayol varsa temizle
+                old_lnk = os.path.join(os.getenv('APPDATA'), r'Microsoft\Windows\Start Menu\Programs\Startup', 'GTA_Asistan_Launcher.lnk')
+                if os.path.exists(old_lnk):
+                    os.remove(old_lnk)
+                    
+                QMessageBox.information(self, "Bilgi", "Windows başlangıcına eklendi (Yönetici Modu).")
+            except subprocess.CalledProcessError as e:
+                logging.error(f"Startup task creation failed: {e}")
+                QMessageBox.critical(self, "Hata", f"Başlangıç görevi oluşturulamadı.\nLütfen uygulamayı Yönetici olarak çalıştırdığınızdan emin olun.\nHata: {e}")
+            except Exception as e:
+                logging.error(f"Startup task error: {e}")
+                QMessageBox.critical(self, "Hata", f"Bir hata oluştu: {e}")
+                
         else:
-            if os.path.exists(startup_path):
-                os.remove(startup_path)
+            try:
+                # Görevi sil
+                subprocess.run(["schtasks", "/delete", "/tn", task_name, "/f"], 
+                               check=True, creationflags=subprocess.CREATE_NO_WINDOW)
                 QMessageBox.information(self, "Bilgi", "Windows başlangıcından kaldırıldı.")
+            except subprocess.CalledProcessError:
+                # Görev zaten yoksa sorun değil
+                pass
+            except Exception as e:
+                QMessageBox.critical(self, "Hata", f"Görev silinemedi: {e}")
 
     def check_status(self):
         db_file = os.path.join(APP_DIR, "gta_tum_araclar.json")
@@ -931,21 +977,28 @@ class LauncherWindow(QMainWindow):
              return
 
         try:
+            # PIPE kullanmak deadlock'a yol açabilir (buffer dolarsa).
+            # Bu yüzden DEVNULL kullanıyoruz. Loglar zaten debug.log'a yazılıyor.
             if getattr(sys, 'frozen', False):
                 main_exe = os.path.join(APP_DIR, "main.exe")
-                proc = subprocess.Popen([main_exe], cwd=APP_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                proc = subprocess.Popen([main_exe], cwd=APP_DIR, 
+                                      stdout=subprocess.DEVNULL, 
+                                      stderr=subprocess.DEVNULL)
             else:
-                proc = subprocess.Popen([sys.executable, "main.py"], cwd=APP_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                proc = subprocess.Popen([sys.executable, "main.py"], cwd=APP_DIR, 
+                                      stdout=subprocess.DEVNULL, 
+                                      stderr=subprocess.DEVNULL)
             
             # Kısa bir süre bekle ve hata kontrolü yap
             import time
-            time.sleep(0.3)
+            time.sleep(0.5)
             exit_code = proc.poll()
             
             if exit_code is not None:
                 # Process crash oldu veya hemen kapandı
-                stdout, stderr = proc.communicate(timeout=1)
-                error_msg = stderr.decode('utf-8', errors='ignore') if stderr else ""
+                # DEVNULL kullandığımız için stderr okuyamayız. Log dosyasına bakılmalı.
+                QMessageBox.critical(self, "Hata", f"Asistan başlatılamadı (exit code: {exit_code})\n\nLütfen debug.log dosyasını kontrol edin.")
+                return
                 
                 if "OCR" in error_msg and "bulunamadı" in error_msg:
                     QMessageBox.critical(self, "OCR Hatası", 

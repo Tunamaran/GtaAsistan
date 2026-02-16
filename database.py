@@ -6,10 +6,10 @@ import os
 import tempfile
 import threading
 from typing import Optional, Tuple, List, Dict
-from config import APP_DIR
+from config import APP_DIR, DATA_DIR
 
 # === Garaj Sistemi ===
-GARAGE_FILE = os.path.join(APP_DIR, "garajim.json")
+GARAGE_FILE = os.path.join(DATA_DIR, "garajim.json")
 
 # Basit dosya cache (Tekrar tekrar disk okumasını önler)
 _garage_cache: Optional[List[str]] = None
@@ -131,9 +131,10 @@ def load_vehicle_database() -> Tuple[Dict, List[Dict]]:
                 if manufacturer and full_name.startswith(manufacturer):
                     clean_name = full_name[len(manufacturer):].strip()
                 search_dict[clean_name] = car 
+            print(f"[DEBUG] Veritabanı yüklendi: {len(db_data)} araç, {len(search_dict)} aranabilir.")
             return search_dict, db_data
     except FileNotFoundError:
-        print("[HATA] gta_tum_araclar.json dosyası bulunamadı!")
+        print(f"[HATA] gta_tum_araclar.json dosyası bulunamadı! Yol: {os.path.join(APP_DIR, 'gta_tum_araclar.json')}")
         return {}, []
     except (json.JSONDecodeError, IOError) as e:
         print(f"[HATA] Veritabanı okunamadı: {e}")

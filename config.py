@@ -6,6 +6,35 @@ import sys
 import copy
 import tempfile
 from typing import Dict, Any
+import logging
+
+def setup_logging():
+    """Loglama yapılandırmasını başlatır."""
+    # Program Files gibi korumalı dizinlere yazmaya çalışırsak hata alırız.
+    # Bu yüzden logları LocalAppData klasörüne kaydediyoruz.
+    log_dir = os.path.join(os.getenv('LOCALAPPDATA'), "GtaAsistan")
+    os.makedirs(log_dir, exist_ok=True)
+    
+    log_file = os.path.join(log_dir, "debug.log")
+    
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8', mode='w'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    # 3. Parti kütüphanelerin loglarını sustur
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("PIL").setLevel(logging.WARNING)
+    logging.getLogger("mss").setLevel(logging.WARNING)
+
+    logging.info("==========================================")
+    logging.info(f"GTA Asistan Başlatılıyor... (v1.0)")
+    logging.info(f"App Dir: {APP_DIR}")
+    logging.info(f"Log Dir: {log_dir}")
+    logging.info("==========================================")
 
 def get_app_dir() -> str:
     """PyInstaller frozen mod ve normal mod için uygulama dizinini döndürür."""
@@ -14,7 +43,11 @@ def get_app_dir() -> str:
     return os.path.dirname(os.path.abspath(__file__))
 
 APP_DIR = get_app_dir()
-CONFIG_FILE = os.path.join(APP_DIR, "config.json")
+# Kullanıcı verilerini LocalAppData içinde sakla
+DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA'), "GtaAsistan")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 
 import ctypes
 

@@ -21,6 +21,7 @@ a = Analysis(
         'winrt.windows.globalization',
         'winrt.windows.foundation',
         'winrt.windows.foundation.collections',
+        'mss', 'cv2', 'numpy', 'PIL', 'keyboard', 'thefuzz',
     ],
     hookspath=[],
     hooksconfig={},
@@ -45,6 +46,7 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     icon='app_icon.ico',
+    uac_admin=True,
 )
 
 coll = COLLECT(
