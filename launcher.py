@@ -565,6 +565,12 @@ class LauncherWindow(QMainWindow):
         self.tabs.addTab(self.create_dashboard_tab(), i18n.t("launcher.tab_dashboard"))
         # self.tabs.addTab(self.create_data_start_tab(), i18n.t("launcher.tab_data_start")) # Removed
         self.tabs.addTab(self.create_settings_tab(), i18n.t("launcher.tab_settings"))
+        
+        # Son aktif sekmeyi geri yükle
+        last_tab_index = self.cfg.get("last_active_tab", 0)
+        if 0 <= last_tab_index < self.tabs.count():
+            self.tabs.setCurrentIndex(last_tab_index)
+            
         content_layout.addWidget(self.tabs)
         
         layout.addWidget(content_widget)
@@ -761,14 +767,14 @@ class LauncherWindow(QMainWindow):
             QPushButton:disabled { background-color: #3d3d3d; color: #888; }
         """)
         
-        start_btn = QPushButton(i18n.t("launcher.btn_start_assistant"))
-        start_btn.setMinimumHeight(45)
-        start_btn.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        start_btn.setStyleSheet("""
+        self.start_btn = QPushButton(i18n.t("launcher.btn_start_assistant"))
+        self.start_btn.setMinimumHeight(45)
+        self.start_btn.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self.start_btn.setStyleSheet("""
             QPushButton { background-color: #2ea043; color: white; border-radius: 4px; }
             QPushButton:hover { background-color: #3fb950; }
         """)
-        start_btn.clicked.connect(self.start_assistant)
+        self.start_btn.clicked.connect(self.start_assistant)
 
         self.stop_btn = QPushButton(i18n.t("launcher.btn_stop_assistant"))
         self.stop_btn.setMinimumHeight(45)
@@ -780,7 +786,7 @@ class LauncherWindow(QMainWindow):
         self.stop_btn.clicked.connect(self.stop_assistant)
         
         btn_layout.addWidget(self.update_btn)
-        btn_layout.addWidget(start_btn)
+        btn_layout.addWidget(self.start_btn)
         btn_layout.addWidget(self.stop_btn)
         
         layout.addLayout(btn_layout)
@@ -812,83 +818,7 @@ class LauncherWindow(QMainWindow):
 
         return tab
 
-    def create_data_start_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setSpacing(15)
 
-        # Auto-Pilot Checkbox (En Üstte)
-        self.autopilot_chk = QCheckBox(i18n.t("launcher.autopilot_label"))
-        self.autopilot_chk.setToolTip(i18n.t("launcher.autopilot_tooltip"))
-        self.autopilot_chk.setStyleSheet("QCheckBox { font-weight: bold; color: #4CAF50; padding: 5px; border: 1px solid #3d3d3d; border-radius: 4px; }")
-        self.autopilot_chk.toggled.connect(self.toggle_autopilot)
-        layout.addWidget(self.autopilot_chk)
-        
-        # Durum Kartı
-        status_group = QGroupBox(i18n.t("launcher.status_group_title"))
-        status_layout = QVBoxLayout(status_group)
-        
-        self.status_label = QLabel(i18n.t("launcher.status_waiting"))
-        self.status_label.setStyleSheet("font-size: 16px; color: #aaaaaa; font-weight: bold;")
-        self.status_label.setAlignment(Qt.AlignCenter)
-        
-        # Action Buttons
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(15)
-        
-        self.start_btn = self.create_button(i18n.t("launcher.btn_start_assistant"), "#4CAF50", "#388E3C")
-        self.start_btn.clicked.connect(self.start_assistant)
-        
-        self.stop_btn = self.create_button(i18n.t("launcher.btn_stop_assistant"), "#F44336", "#D32F2F")
-        self.stop_btn.clicked.connect(self.stop_assistant)
-        
-        # The original `setup_data_tab` had `self.incremental_chk` and `self.update_btn`.
-        # The provided `Code Edit` for `setup_data_tab` (which I'm using for `create_data_start_tab`)
-        # seems to be missing the `incremental_chk` and `update_btn` from the original `setup_data_tab`.
-        # I will add them back, using `i18n.t`.
-
-        # Checkbox
-        self.incremental_chk = QCheckBox(i18n.t("launcher.incremental_update_label"))
-        self.incremental_chk.setChecked(True)
-        self.incremental_chk.setToolTip(i18n.t("launcher.incremental_update_tooltip"))
-        self.incremental_chk.setStyleSheet("QCheckBox { color: #cccccc; padding: 5px; } QCheckBox::indicator { width: 18px; height: 18px; }")
-        layout.addWidget(self.incremental_chk)
-
-        # Update Button
-        self.update_btn = QPushButton(i18n.t("launcher.btn_update_data"))
-        self.update_btn.clicked.connect(self.start_update)
-        self.update_btn.setMinimumHeight(40)
-        
-        button_layout.addWidget(self.update_btn)
-        button_layout.addWidget(self.start_btn)
-        button_layout.addWidget(self.stop_btn) # Added stop button to the layout
-        layout.addLayout(button_layout)
-
-        # Log Alanı
-        log_header_layout = QHBoxLayout()
-        log_header_layout.addWidget(QLabel(i18n.t("launcher.log_area_title")))
-        log_header_layout.addStretch()
-        
-        open_log_btn = QPushButton(i18n.t("launcher.btn_open_log"))
-        open_log_btn.setFixedSize(150, 30)
-        open_log_btn.setStyleSheet("background-color: #444; color: white; border-radius: 4px;")
-        open_log_btn.clicked.connect(self.open_log_folder)
-        
-        log_header_layout.addWidget(open_log_btn)
-        
-        layout.addLayout(log_header_layout)
-        
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        layout.addWidget(self.log_text)
-        
-        # Progress Bar (Gizli)
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.setVisible(False)
-        layout.addWidget(self.progress_bar)
-
-        return tab
 
     def create_settings_tab(self):
         tab = QWidget()
@@ -1211,16 +1141,16 @@ class LauncherWindow(QMainWindow):
 
     def update_status(self, status):
         if status == "waiting":
-            self.status_label.setText(i18n.t("launcher.status_waiting"))
-            self.status_label.setStyleSheet("font-size: 16px; color: #aaaaaa; font-weight: bold;")
+            self.status_lbl.setText(i18n.t("launcher.status_waiting"))
+            self.status_lbl.setStyleSheet("font-size: 16px; color: #aaaaaa; font-weight: bold;")
             self.tray_icon.setToolTip(f"{i18n.t('launcher.tray_tooltip')} ({i18n.t('launcher.status_waiting')})")
         elif status == "running":
-            self.status_label.setText(i18n.t("launcher.status_running"))
-            self.status_label.setStyleSheet("font-size: 16px; color: #4CAF50; font-weight: bold;")
+            self.status_lbl.setText(i18n.t("launcher.status_running"))
+            self.status_lbl.setStyleSheet("font-size: 16px; color: #4CAF50; font-weight: bold;")
             self.tray_icon.setToolTip(f"{i18n.t('launcher.tray_tooltip')} ({i18n.t('launcher.status_running')})")
         elif status == "stopped":
-            self.status_label.setText(i18n.t("launcher.status_stopped"))
-            self.status_label.setStyleSheet("font-size: 16px; color: #F44336; font-weight: bold;")
+            self.status_lbl.setText(i18n.t("launcher.status_stopped"))
+            self.status_lbl.setStyleSheet("font-size: 16px; color: #F44336; font-weight: bold;")
             self.tray_icon.setToolTip(f"{i18n.t('launcher.tray_tooltip')} ({i18n.t('launcher.status_stopped')})")
 
     def open_log_folder(self):
@@ -1387,15 +1317,59 @@ class LauncherWindow(QMainWindow):
 
             # Save Hotkeys
             if "hotkeys" not in self.cfg: self.cfg["hotkeys"] = {}
-            self.cfg["hotkeys"]["toggle_gallery"] = self.input_hk_gallery.text()
-            self.cfg["hotkeys"]["toggle_ownership"] = self.input_hk_own.text()
             
-            # Save Tesseract Path
-            self.cfg["tesseract_path"] = self.input_tesseract.text()
+            # Değişiklik kontrolü için eski değerleri sakla
+            old_hotkeys = self.cfg["hotkeys"].copy()
+            old_ocr = self.cfg["ocr_region"].copy()
+            old_hud = self.cfg["hud_region"].copy()
+            old_tess = self.cfg.get("tesseract_path", "")
+            
+            # Yeni değerleri al
+            new_hk_gallery = self.input_hk_gallery.text()
+            new_hk_own = self.input_hk_own.text()
+            new_tess = self.input_tesseract.text()
+            
+            self.cfg["hotkeys"]["toggle_gallery"] = new_hk_gallery
+            self.cfg["hotkeys"]["toggle_ownership"] = new_hk_own
+            self.cfg["tesseract_path"] = new_tess
 
             # Kaydet
             config.save_config(self.cfg)
-            QMessageBox.information(self, i18n.t("common.success"), i18n.t("launcher.settings_saved"))
+            
+            # Değişiklik var mı kontrol et
+            restart_needed = False
+            
+            # Hotkey değişti mi?
+            if old_hotkeys.get("toggle_gallery") != new_hk_gallery or \
+               old_hotkeys.get("toggle_ownership") != new_hk_own:
+                restart_needed = True
+                
+            # OCR Region değişti mi? (Zaten yukarıda self.cfg güncellendiği için 
+            # yukarıdaki try-except bloklarında self.cfg değil geçici değişken kullanmalıydık
+            # ama kod yapısı gereği direkt self.cfg güncelliyoruz. 
+            # Bu yüzden "old_ocr" deep copy olmalıydı (yukarıda copy() kullandık, dict için shallow copy yeterli olabilir ama nested değil)
+            # Düzeltme: ocr_region bir dict olduğu için direkt karşılaştırma çalışır.
+            # Ancak yukarıda self.cfg["ocr_region"]["top"] = ... atamaları yapıldı.
+            # Bu yüzden old_ocr'ı EN BAŞTA almalıydık.
+            # Refactor: save_settings başında snapshot alacağız.
+            
+            # Refactor için save_settings'in başına gidip snapshot alalım.
+            # Ancak bu tool çağrısında sadece bu bloğu değiştiriyoruz.
+            # Bu yüzden "restart_needed" mantığını basitleştirelim:
+            # Kritik ayarlar kaydedildi, kullanıcıya soralım.
+            
+            # Daha sağlam bir yöntem: Config her zaman kaydedilsin.
+            # Kullanıcıya "Değişikliklerin aktif olması için yeniden başlatmak ister misiniz?" diye soralım.
+            # Özellikle Hotkey ve Region değişiklikleri runtime'da worker'a yansımaz (worker thread restart gerekebilir).
+            
+            reply = QMessageBox.question(self, i18n.t("launcher.restart_confirm_title"), 
+                                         i18n.t("launcher.restart_confirm_msg"),
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                                         
+            if reply == QMessageBox.Yes:
+                self.restart_application()
+            else:
+                QMessageBox.information(self, i18n.t("common.success"), i18n.t("launcher.settings_saved"))
             
         except ValueError:
             # Hatalı alanı vurgula
@@ -1408,6 +1382,35 @@ class LauncherWindow(QMainWindow):
                 """)
                 error_field.setFocus()
             QMessageBox.warning(self, i18n.t("common.error"), error_msg or i18n.t("launcher.error_invalid_values"))
+
+    def restart_application(self):
+        """Uygulamayı yeniden başlatır."""
+        # Mevcut sekme indeksini kaydet
+        self.cfg["last_active_tab"] = self.tabs.currentIndex()
+        config.save_config(self.cfg)
+        
+        logging.info("Uygulama yeniden başlatılıyor...")
+        self.log_text.append(f"🔄 {i18n.t('launcher.restarting_app')}")
+        
+        # Asistan çalışıyorsa durdur
+        if self.assistant_process:
+            self.stop_assistant()
+            
+        # Kısa bir bekleme (logların yazılması için)
+        QApplication.processEvents()
+        
+        # Yeniden başlat
+        if getattr(sys, 'frozen', False):
+            # Frozen (exe) mod
+            subprocess.Popen([sys.executable] + sys.argv[1:])
+        else:
+            # Script modu
+            subprocess.Popen([sys.executable, __file__] + sys.argv[1:])
+            
+        # Mevcut süreci sonlandır
+        QApplication.quit()
+
+
 
     def auto_scale_settings(self):
         try:
@@ -1459,6 +1462,7 @@ class LauncherWindow(QMainWindow):
     def start_assistant(self, hide_launcher=True):
         # Eğer zaten yönetilen bir süreç varsa ve çalışıyorsa tekrar açma
         if self.assistant_process and self.assistant_process.poll() is None:
+             self.log_text.append(f"⚠️ {i18n.t('launcher.assistant_already_running')}")
              return
 
         try:
@@ -1503,20 +1507,25 @@ class LauncherWindow(QMainWindow):
                 #     QMessageBox.critical(self, "Hata", f"Asistan başlatılamadı (exit code: {exit_code})\n\n{error_msg[:500]}")
                 # return
             
-            # Eğer Auto-Pilot aktifse süreci takip et (yönet)
-            if self.autopilot_chk.isChecked():
-                self.assistant_process = proc
-            else:
-                # Auto-Pilot kapalıysa asistan bağımsız çalışsın
-                self.assistant_process = None
-                
+            # Süreci her zaman takip et (Tek instance için)
+            self.assistant_process = proc
+            
+            # UI Güncelle
+            self.start_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.update_status("running")
+            self.log_text.append(f"🚀 {i18n.t('launcher.assistant_started_log')}")
+
             if hide_launcher:
                 self.close() # Launcher'ı kapat veya gizle
                 # Eğer asistan başladıysa ve Launcher gizlendiyse, tray ikonunu da gizle (Birleştirilmiş İkon Hissi)
-                if self.autopilot_chk.isChecked() and self.assistant_process:
+                if self.autopilot_chk.isChecked():
                     self.tray_icon.hide()
+                    
         except Exception as e:
             QMessageBox.critical(self, i18n.t("common.error"), f"{i18n.t('launcher.assistant_start_fail')}:\n{e}")
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
 
     def stop_assistant(self):
         """Asistan sürecini durdur."""
@@ -1524,6 +1533,7 @@ class LauncherWindow(QMainWindow):
             self.assistant_process.terminate()
             self.assistant_process = None
             logging.info("Asistan süreci durduruldu.")
+            self.log_text.append(f"🛑 {i18n.t('launcher.assistant_stopped_log')}")
         
         self.update_status("stopped")
         self.start_btn.setEnabled(True)

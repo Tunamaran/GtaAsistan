@@ -91,7 +91,13 @@
         "tesseract_path_label": "Tesseract EXE Yolu:",
         "btn_browse": "Gözat...",
         "fix_ocr_confirm": "Windows OCR onarım komutu Yönetici olarak çalıştırılacak.\nDevam edilsin mi?",
-        "fix_ocr_sent": "Onarım komutu gönderildi. Lütfen açılan PowerShell penceresini takip edin."
+        "fix_ocr_sent": "Onarım komutu gönderildi. Lütfen açılan PowerShell penceresini takip edin.",
+        "assistant_already_running": "Asistan zaten çalışıyor!",
+        "assistant_started_log": "Asistan başlatıldı.",
+        "assistant_stopped_log": "Asistan durduruldu.",
+        "restart_confirm_title": "Yeniden Başlatma Gerekli",
+        "restart_confirm_msg": "Yapılan değişikliklerin etkili olması için uygulamanın yeniden başlatılması gerekiyor.\nŞimdi yeniden başlatılsın mı?",
+        "restarting_app": "Uygulama yeniden başlatılıyor..."
     },
     "common": {
         "error": "Hata",

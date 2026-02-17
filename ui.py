@@ -2578,8 +2578,12 @@ class SettingsWindow(QWidget):
 
     def save_settings(self):
         cfg = load_config()
-
         
+        # Değişiklik kontrolü için eski değerler
+        old_ocr = cfg.get("ocr_region", {}).copy()
+        old_hud = cfg.get("hud_region", {}).copy()
+        old_hotkeys = cfg.get("hotkeys", {}).copy()
+
         cfg["hotkeys"]["toggle_gallery"] = self.hk_gallery.text()
         cfg["hotkeys"]["toggle_ownership"] = self.hk_ownership.text()
         cfg["hotkeys"]["toggle_ocr"] = self.hk_ocr.text()
@@ -2596,8 +2600,60 @@ class SettingsWindow(QWidget):
         cfg["hud_region"]["height"] = self.hud_height.value()
         
         save_config(cfg)
-        QMessageBox.information(self, "Kaydedildi", "Ayarlar başarıyla kaydedildi.\nDeğişikliklerin tam olarak etki etmesi için lütfen uygulamayı yeniden başlatın.")
-        self.close()
+        
+        # Değişiklik kontrolü
+        restart_needed = False
+        
+        # Basit karşılaştırma (Dict eşitliği yeterli)
+        if old_ocr != cfg["ocr_region"] or \
+           old_hud != cfg["hud_region"] or \
+           old_hotkeys != cfg["hotkeys"]:
+            restart_needed = True
+            
+        if restart_needed:
+            reply = QMessageBox.question(self, i18n.t("launcher.restart_confirm_title"), 
+                                         i18n.t("launcher.restart_confirm_msg"),
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if reply == QMessageBox.Yes:
+                self.restart_application()
+            else:
+                QMessageBox.information(self, i18n.t("common.success"), i18n.t("launcher.settings_saved"))
+                self.close()
+        else:
+            QMessageBox.information(self, i18n.t("common.success"), i18n.t("launcher.settings_saved"))
+            self.close()
+
+    def restart_application(self):
+        """Uygulamayı (Asistanı) yeniden başlatır."""
+        # Eğer main.py içindeysek sys.argv ile yeniden başlatabiliriz
+        import sys
+        import subprocess
+        
+        # Not: GalleryWindow bir QWidget olduğu için QApplication instance'ına erişebiliriz.
+        logging.info("Asistan (UI) yeniden başlatılıyor...")
+        
+        QApplication.processEvents()
+        
+        # Yeniden başlat
+        if getattr(sys, 'frozen', False):
+            # Frozen (exe) mod
+            # Main exe'yi bulmaya gerek yok, sys.executable zaten o olmalı
+            subprocess.Popen([sys.executable] + sys.argv[1:])
+        else:
+            # Script modu - main.py'yi bulmamız lazım
+            # ui.py içindeyiz, main.py bir üst dizinde veya aynı dizinde
+            # Ancak __file__ ui.py'yi gösterir. 
+            # Güvenli yol: sys.argv[0] main.py olmalı.
+            script_path = sys.argv[0]
+            if not script_path.endswith(".py"):
+                # Fallback: Mevcut dizindeki main.py
+                import os
+                script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py")
+                
+            subprocess.Popen([sys.executable, script_path] + sys.argv[1:])
+            
+        QApplication.quit()
+
 
     def start_snip(self):
         self.hide()

@@ -91,7 +91,13 @@
         "tesseract_path_label": "Tesseract EXE Path:",
         "btn_browse": "Browse...",
         "fix_ocr_confirm": "Windows OCR repair command will run as Administrator.\nContinue?",
-        "fix_ocr_sent": "Repair command sent. Please follow the PowerShell window."
+        "fix_ocr_sent": "Repair command sent. Please follow the PowerShell window.",
+        "assistant_already_running": "Assistant is already running!",
+        "assistant_started_log": "Assistant started.",
+        "assistant_stopped_log": "Assistant stopped.",
+        "restart_confirm_title": "Restart Required",
+        "restart_confirm_msg": "The application needs to be restarted for the changes to take effect.\nRestart now?",
+        "restarting_app": "Restarting application..."
     },
     "common": {
         "error": "Error",
