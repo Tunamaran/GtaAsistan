@@ -31,10 +31,8 @@ Ekrandaki araç isimlerini gerçek zamanlı olarak okur ve detaylı bilgileri ov
 
 ## 🚀 Hızlı Kurulum
 
-### Adım 1: Installer'ı İndir
-```
-[Son Sürümü İndir](https://github.com/tunamaran/GtaAsistan/releases/latest)
-```
+### Adım 1: Kurulum için aşağıdaki bağlantıdan yükleyiciyi indirebilirsiniz:
+[**Son Sürümü İndir / Download Latest Release**](https://github.com/tunamaran/GtaAsistan/releases/latest)
 
 ### Adım 2: Kur ve Çalıştır
 1. Setup dosyasını çalıştırın (Yönetici izni gereklidir).
@@ -168,10 +166,8 @@ Real-time vehicle name recognition via OCR, displaying detailed information via 
 
 ## 🚀 Quick Setup
 
-### Step 1: Download Installer
-```
-[Download Latest Release](https://github.com/tunamaran/GtaAsistan/releases/latest)
-```
+### Step 1: You can download the installer from the following link:
+[**Download Latest Release**](https://github.com/tunamaran/GtaAsistan/releases/latest)
 
 ### Step 2: Install & Run
 1. Run the setup file (Requires Admin privileges).
