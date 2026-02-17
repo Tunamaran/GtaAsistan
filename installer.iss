@@ -1,13 +1,13 @@
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
 AppName=GTA Asistan
-AppVersion=17022026.01
+AppVersion=18022026.08
 AppPublisher=GTA Asistan
 DefaultDirName={autopf}\GTA Asistan
 DefaultGroupName=GTA Asistan
 DisableProgramGroupPage=yes
 OutputDir=Output
-OutputBaseFilename=GtaAsistan_Setup_v17022026.01
+OutputBaseFilename=GtaAsistan_Setup_v18022026.08
 SetupIconFile=app_icon.ico
 UninstallDisplayIcon={app}\launcher.exe
 Compression=lzma2/ultra64
@@ -36,6 +36,8 @@ Name: "{autodesktop}\GTA Asistan"; Filename: "{app}\launcher.exe"; IconFilename:
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""Add-WindowsCapability -Online -Name 'Language.OCR~~~en-US~0.0.1.0'"""; StatusMsg: "Windows OCR dil paketi kuruluyor..."; Flags: runhidden waituntilterminated; Tasks: installwinrt
+; Do verify OCR after installation
+Filename: "{app}\launcher.exe"; Parameters: "--verify-install --set-lang {language}"; StatusMsg: "Kurulum Doğrulanıyor..."; Flags: waituntilterminated; Tasks: installwinrt
 Filename: "{app}\launcher.exe"; Description: "GTA Asistan Baslat"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallDelete]

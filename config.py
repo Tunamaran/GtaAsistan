@@ -9,22 +9,24 @@ from typing import Dict, Any
 import logging
 
 
-VERSION = "17022026.01"
+VERSION = "18022026.08"
 
 def setup_logging():
     """Loglama yapılandırmasını başlatır."""
     # Program Files gibi korumalı dizinlere yazmaya çalışırsak hata alırız.
     # Bu yüzden logları LocalAppData klasörüne kaydediyoruz.
+    # Bu yüzden logları LocalAppData klasörüne kaydediyoruz.
     log_dir = os.path.join(os.getenv('LOCALAPPDATA'), "GtaAsistan")
     os.makedirs(log_dir, exist_ok=True)
     
-    log_file = os.path.join(log_dir, "debug.log")
+    global LOG_FILE
+    LOG_FILE = os.path.join(log_dir, "debug.log")
     
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(log_file, encoding='utf-8', mode='w'),
+            logging.FileHandler(LOG_FILE, encoding='utf-8', mode='w'),
             logging.StreamHandler(sys.stdout)
         ]
     )
@@ -59,6 +61,7 @@ _dpi_aware_set = False
 
 # 2560x1600 için Referans Ayarlar (Baseline)
 BASELINE_RESOLUTION = (2560, 1600)
+
 
 def _get_default_tesseract_path() -> str:
     """Tesseract varsayılan yolunu döndürür (frozen mod desteği)."""

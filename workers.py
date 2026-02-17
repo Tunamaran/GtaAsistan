@@ -14,13 +14,14 @@ import keyboard
 from thefuzz import process, fuzz
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage
-
+import i18n
 from config import load_config
 
 # Config yükle
 cfg = load_config()
 
 # === OCR Motor Seçimi ===
+pytesseract = None
 LCD = None  # Lazy Loaded
 OCR_ENGINE = None
 
@@ -29,7 +30,7 @@ def get_ocr_engine():
     if OCR_ENGINE is not None:
         return OCR_ENGINE
     
-    logging.info("OCR Motoru başlatılıyor...")
+    logging.info(i18n.t("workers.ocr_initializing"))
     try:
         import winocr
         from PIL import Image as PILImage
@@ -41,26 +42,38 @@ def get_ocr_engine():
             _test_loop.run_until_complete(winocr.recognize_pil(_test_img, lang='en'))
             _test_loop.close()
             OCR_ENGINE = "winocr"
-            logging.info("[OCR] Windows OCR motoru aktif (hızlı mod)")
-            print("[OCR] [OK] Windows OCR motoru aktif (hızlı mod)")
+            logging.info(i18n.t("workers.winocr_active"))
+            print(f"[OCR] [OK] {i18n.t('workers.winocr_active')}")
         except Exception as e:
-            logging.warning(f"[OCR] Windows OCR testi başarısız: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            logging.warning(f"[OCR] Windows OCR init failed. Details:\n{error_details}")
+            # Hata mesajını daha anlaşılır hale getir (Kullanıcıya göstermek için saklanabilir)
             raise e
 
-    except (ImportError, RuntimeError, OSError, AttributeError, AssertionError) as e:
-        logging.warning(f"[OCR] Windows OCR kullanılamıyor, Tesseract aranıyor... Hata: {e}")
-        print("[OCR] [UYARI] Windows OCR yüklenemedi, Tesseract kullanılıyor.")
+    except Exception as e:
+        logging.warning(f"{i18n.t('workers.winocr_fail_fallback')} {e}")
+        print(f"[OCR] [UYARI] {i18n.t('workers.winocr_fail_fallback')}")
         
         try:
+            global pytesseract
             import pytesseract
-            _tess_path = cfg.get("tesseract_path", r'C:\Program Files\Tesseract-OCR\tesseract.exe')
+            # Dinamik yol kontrolü
+            from config import _get_default_tesseract_path
+            _tess_path = cfg.get("tesseract_path", _get_default_tesseract_path())
+            
+            if not os.path.exists(_tess_path):
+                logging.error(f"{i18n.t('workers.tesseract_not_found')}: {_tess_path}")
+                # Fallback to system path if bundled fails
+                _tess_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+                
             pytesseract.pytesseract.tesseract_cmd = _tess_path
             OCR_ENGINE = "tesseract"
-            logging.info("[OCR] Tesseract OCR kullanılıyor.")
-            print("[OCR] [BILGI] Tesseract OCR kullanılıyor.")
-        except ImportError:
-             logging.error("Hiçbir OCR motoru bulunamadı!")
-             OCR_ENGINE = "none" # Fail gracefully
+            logging.info(f"{i18n.t('workers.tesseract_active')} {_tess_path}")
+            print(f"[OCR] [BILGI] {i18n.t('workers.tesseract_active')} ({_tess_path})")
+        except Exception as te:
+             logging.error(f"Tesseract yapılandırılamadı: {te}")
+             OCR_ENGINE = "none"
     
     return OCR_ENGINE
 
@@ -156,9 +169,15 @@ class OcrThread(QThread):
         self.search_dict = search_dict
         self.search_keys = list(search_dict.keys())
         self.running = True
-        self.paused = False  # YENİ: Duraklatma kontrolü
+        self.paused = False
         self.last_gta_state = None
         self._loop = None
+        
+        # Ekran Çözünürlüğüne Göre Ölçek Faktörü (Tesseract Konturları İçin)
+        from config import get_screen_resolution, BASELINE_RESOLUTION
+        curr_w, curr_h = get_screen_resolution()
+        self.scale_factor = curr_h / BASELINE_RESOLUTION[1]
+        logging.debug(f"[OCR] Ölçek faktörü belirlendi: {self.scale_factor:.2f} ({curr_h}/1600)")
 
     # =====================================================
     # Tesseract modu: Kontur tabanlı (eski yaklaşım)
@@ -282,6 +301,10 @@ class OcrThread(QThread):
     # =====================================================
     def run(self) -> None:
         """Ana OCR döngüsü — motor tipine göre farklı yol izler."""
+        # Config'i tazele (Launcher'da değişmiş olabilir)
+        global cfg
+        cfg = load_config()
+        
         engine = get_ocr_engine()
         if engine == "winocr":
             self._run_winocr_loop()
@@ -467,8 +490,14 @@ class OcrThread(QThread):
                         
                         for cnt in contours:
                             x, y, w, h = cv2.boundingRect(cnt)
-                            if not (self.MIN_CONTOUR_WIDTH < w < self.MAX_CONTOUR_WIDTH 
-                                    and self.MIN_CONTOUR_HEIGHT < h < self.MAX_CONTOUR_HEIGHT):
+                            
+                            # Ölçekli eşik değerleri kontrolü
+                            min_w = self.MIN_CONTOUR_WIDTH * self.scale_factor
+                            max_w = self.MAX_CONTOUR_WIDTH * self.scale_factor
+                            min_h = self.MIN_CONTOUR_HEIGHT * self.scale_factor
+                            max_h = self.MAX_CONTOUR_HEIGHT * self.scale_factor
+                            
+                            if not (min_w < w < max_w and min_h < h < max_h):
                                 continue
                             
                             crop_w = w - 10 if w > 50 else w

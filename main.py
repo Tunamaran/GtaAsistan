@@ -10,6 +10,7 @@ from workers import OcrThread, HotkeyThread
 from ui import OverlayHUD, GalleryWindow, StatusHUD
 from config import load_config, setup_logging
 from history import VehicleHistory
+import i18n
 
 
 class LRUCache:
@@ -74,7 +75,7 @@ class JarvisApp:
         self.vehicle_history = VehicleHistory()
         
         if not self.search_dict:
-            print("[HATA] Araç veritabanı yüklenemedi! Çıkılıyor...")
+            print(i18n.t("main.db_error"))
             sys.exit()
 
         self.image_cache = LRUCache(max_size=200)  # LRU cache
@@ -105,12 +106,12 @@ class JarvisApp:
         # Sistem Tepsisi
         self.setup_system_tray()
         
-        print("[SİSTEM] J.A.R.V.I.S Asistanı Aktif!")
+        print(i18n.t("main.system_active"))
         
         hk_gallery = self.cfg["hotkeys"].get("toggle_gallery", "f11")
         hk_ownership = self.cfg["hotkeys"].get("toggle_ownership", "f9")
-        print(f"[BİLGİ] Galeri: {hk_gallery.upper()} | Garaja Ekle/Çıkar: {hk_ownership.upper()}")
-        print("[BİLGİ] Sistem tepsisine küçültüldü (saat yanındaki ikon).")
+        print(i18n.t("main.hotkey_info", gallery=hk_gallery.upper(), ownership=hk_ownership.upper()))
+        print(i18n.t("main.minimized_info"))
 
         
         # Görünürlük durumlarını takip etmek için
@@ -129,31 +130,31 @@ class JarvisApp:
         """)
         
         # Galeri Aç
-        action_gallery = QAction("🏎️ Galeri Aç", self.app)
+        action_gallery = QAction(i18n.t("tray.open_gallery"), self.app)
         action_gallery.triggered.connect(self.toggle_gallery)
         tray_menu.addAction(action_gallery)
         
         # Ayarlar
-        action_settings = QAction("⚙️ Ayarlar", self.app)
+        action_settings = QAction(i18n.t("tray.settings"), self.app)
         action_settings.triggered.connect(self.open_settings)
         tray_menu.addAction(action_settings)
         
         tray_menu.addSeparator()
         
         # OCR Durdur/Başlat
-        self.action_ocr_toggle = QAction("⏸️ OCR Durdur", self.app)
+        self.action_ocr_toggle = QAction(i18n.t("tray.stop_ocr"), self.app)
         self.action_ocr_toggle.triggered.connect(self.toggle_ocr)
         tray_menu.addAction(self.action_ocr_toggle)
         
         tray_menu.addSeparator()
         
         # Çıkış
-        action_exit = QAction("❌ Çıkış", self.app)
+        action_exit = QAction(i18n.t("tray.exit"), self.app)
         action_exit.triggered.connect(self.quit_app)
         tray_menu.addAction(action_exit)
         
         self.tray_icon.setContextMenu(tray_menu)
-        self.tray_icon.setToolTip("J.A.R.V.I.S - GTA Asistan")
+        self.tray_icon.setToolTip(i18n.t("tray.tooltip"))
         self.tray_icon.activated.connect(self.on_tray_activated)
         self.tray_icon.show()
     
@@ -167,14 +168,14 @@ class JarvisApp:
         self.ocr_thread.paused = not self.ocr_thread.paused
         
         if self.ocr_thread.paused:
-            self.action_ocr_toggle.setText("▶️ OCR Başlat")
+            self.action_ocr_toggle.setText(i18n.t("tray.start_ocr"))
             self.hud.hide()
             self.status_hud.update_status(False)
-            print("[SİSTEM] OCR durduruldu (PAUSED).")
+            print(i18n.t("main.ocr_paused"))
         else:
-            self.action_ocr_toggle.setText("⏸️ OCR Durdur")
+            self.action_ocr_toggle.setText(i18n.t("tray.stop_ocr"))
             self.status_hud.update_status(True)
-            print("[SİSTEM] OCR devam ettiriliyor.")
+            print(i18n.t("main.ocr_resumed"))
     
     def open_settings(self):
         """Ayarlar penceresini açar."""
@@ -218,7 +219,7 @@ class JarvisApp:
     
     def quit_app(self):
         """Uygulamadan tamamen çıkar. Thread'leri düzgün kapatır."""
-        print("[SİSTEM] Uygulama kapatılıyor...")
+        print(i18n.t("main.app_closing"))
         
         # OCR thread'ini durdur
         self.ocr_thread.running = False
@@ -260,8 +261,8 @@ class JarvisApp:
             name = self.current_vehicle_data.get("Vehicle Name")
             if name:
                 is_added = toggle_vehicle_ownership(name)
-                state = "EKLENDİ" if is_added else "ÇIKARILDI"
-                print(f"[GARAJ] {name} -> {state}")
+                state = i18n.t("main.garage_added") if is_added else i18n.t("main.garage_removed")
+                print(i18n.t("main.garage_toggle", name=name, state=state))
                 
                 # Arayüzü anında güncelle
                 self.hud.update_ui(self.current_vehicle_data)

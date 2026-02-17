@@ -5,16 +5,17 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QLineEdit, QComboBox, QPushButton,
     QScrollArea, QStackedWidget, QCheckBox, QApplication,
     QFormLayout, QSpinBox, QFileDialog, QMessageBox,
-    QRubberBand, QLayout, QSizePolicy, QGroupBox, QMenu, QAction
+    QRubberBand, QLayout, QSizePolicy, QGroupBox, QMenu, QAction,
+    QProgressBar, QGraphicsDropShadowEffect
 )
 # PyQt5 - Core
 from PyQt5.QtCore import (
-    Qt, QTimer, QRect, QSize, QPoint, QRectF, pyqtSignal, QEvent
+    Qt, QTimer, QRect, QSize, QPoint, QRectF, pyqtSignal, QEvent, QUrl, QPropertyAnimation, QEasingCurve
 )
 # PyQt5 - GUI
 from PyQt5.QtGui import (
     QFont, QFontMetrics, QPainter, QPainterPath, QColor, QPen, QBrush,
-    QPixmap, QImage, QCursor, QLinearGradient
+    QPixmap, QImage, QCursor, QLinearGradient, QIcon, QDesktopServices
 )
 
 # Proje Modülleri
@@ -25,6 +26,8 @@ import logging
 import ctypes
 from ctypes.wintypes import MSG
 from ctypes import c_long, c_int, c_short
+import i18n
+import requests
 
 
 # ==========================================
@@ -257,7 +260,7 @@ class VehicleCard(QFrame):
 
         
 
-        name = vehicle_data.get("Vehicle Name", "Bilinmiyor")
+        name = vehicle_data.get("Vehicle Name", i18n.t("card.unknown"))
 
         v_class = vehicle_data.get("Vehicle Class", "")
 
@@ -333,14 +336,21 @@ class VehicleCard(QFrame):
         is_owned = name in garage
         
         # Garaj aksiyonu
-        action_garage = QAction("✅ Garajdan Çıkar" if is_owned else "➕ Garaja Ekle", self)
+        action_garage = QAction(i18n.t("card.remove_garage") if is_owned else i18n.t("card.add_garage"), self)
         action_garage.triggered.connect(lambda: self._toggle_garage(name))
         menu.addAction(action_garage)
         
         menu.addSeparator()
         
+        # Google'da Ara
+        action_search = QAction(i18n.t("card.search_google"), self)
+        action_search.triggered.connect(lambda: QDesktopServices.openUrl(QUrl(f"https://www.google.com/search?q=GTA+Online+{name.replace(' ', '+')}")))
+        menu.addAction(action_search)
+        
+        menu.addSeparator()
+        
         # Detay aksiyonu
-        action_detail = QAction("🔍 Detayları Gör", self)
+        action_detail = QAction(i18n.t("card.view_details"), self)
         action_detail.triggered.connect(lambda: self.clicked.emit(self.vehicle_data))
         menu.addAction(action_detail)
         
@@ -683,7 +693,7 @@ class GalleryWindow(QWidget):
 
             count, value = get_garage_stats(self.db_data)
 
-            self.stats_label.setText(f"💰 TOPLAM GARAJ DEĞERİ: <span style='color:#fdcb6e;'>{value}</span> &nbsp;&nbsp;|&nbsp;&nbsp; 🏎️ ARAÇ SAYISI: <span style='color:#00FF96;'>{count}</span>")
+            self.stats_label.setText(i18n.t("gallery.garage_stats", value=value, count=count))
 
             self.stats_label.show()
             self.stacked_widget.setCurrentIndex(0)
@@ -741,32 +751,22 @@ class GalleryWindow(QWidget):
         tabs_layout.setSpacing(15)
 
         
-
-        self.btn_store = QPushButton("🛒 MAĞAZA (TÜM ARAÇLAR)")
-
+        self.btn_store = QPushButton(i18n.t("gallery.tab_store"))
         self.btn_store.setCursor(QCursor(Qt.PointingHandCursor))
-
         self.btn_store.clicked.connect(lambda: self.switch_tab("STORE"))
-
         tabs_layout.addWidget(self.btn_store)
 
-        
-
-        self.btn_garage = QPushButton("🏠 GARAJIM")
-
+        self.btn_garage = QPushButton(i18n.t("gallery.tab_garage"))
         self.btn_garage.setCursor(QCursor(Qt.PointingHandCursor))
-
         self.btn_garage.clicked.connect(lambda: self.switch_tab("GARAGE"))
-
         tabs_layout.addWidget(self.btn_garage)
-
         
-        self.btn_analytics = QPushButton("📊 ANALİTİK")
+        self.btn_analytics = QPushButton(i18n.t("gallery.tab_analytics"))
         self.btn_analytics.setCursor(QCursor(Qt.PointingHandCursor))
         self.btn_analytics.clicked.connect(lambda: self.switch_tab("ANALYTICS"))
         tabs_layout.addWidget(self.btn_analytics)
 
-        self.btn_history = QPushButton("🕐 GEÇMİŞ")
+        self.btn_history = QPushButton(i18n.t("gallery.tab_history"))
         self.btn_history.setCursor(QCursor(Qt.PointingHandCursor))
         self.btn_history.clicked.connect(lambda: self.switch_tab("HISTORY"))
         tabs_layout.addWidget(self.btn_history)
@@ -779,7 +779,7 @@ class GalleryWindow(QWidget):
 
         # --- YENİ: İstatistik Barı ---
 
-        self.stats_label = QLabel("Yükleniyor...")
+        self.stats_label = QLabel(i18n.t("gallery.loading"))
 
         self.stats_label.setAlignment(Qt.AlignCenter)
 
@@ -812,37 +812,42 @@ class GalleryWindow(QWidget):
         # -----------------------------
 
         
-
         top_bar_1 = QHBoxLayout()
         top_bar_1.setSpacing(15)
 
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Araç Ara (Örn: Zentorno, T20)...")
-        self.search_box.setToolTip("Araç ismi veya markasına göre arama yapın")
-        self.search_box.setAccessibleName("Araç Arama Kutusu")
+        self.search_box.setPlaceholderText(i18n.t("gallery.search_placeholder"))
+        self.search_box.setToolTip(i18n.t("gallery.search_tooltip"))
+        self.search_box.setAccessibleName(i18n.t("gallery.search_accessible_name"))
         self.search_box.textChanged.connect(self.apply_filters)
         top_bar_1.addWidget(self.search_box, stretch=2)
 
         self.sort_box = QComboBox()
-        self.sort_box.addItems(["Sıralama: Varsayılan", "Fiyat: Önce En Pahalı", "Fiyat: Önce En Ucuz", "Hız: En Hızlılar", "İvme: En Yüksek Kalkış"])
-        self.sort_box.setToolTip("Araçları farklı kriterlere göre sıralayın")
-        self.sort_box.setAccessibleName("Sıralama Seçenekleri")
+        self.sort_box.addItems([
+            i18n.t("gallery.sort_default"),
+            i18n.t("gallery.sort_price_desc"),
+            i18n.t("gallery.sort_price_asc"),
+            i18n.t("gallery.sort_speed_desc"),
+            i18n.t("gallery.sort_accel_desc")
+        ])
+        self.sort_box.setToolTip(i18n.t("gallery.sort_tooltip"))
+        self.sort_box.setAccessibleName(i18n.t("gallery.sort_accessible_name"))
         self.sort_box.currentTextChanged.connect(self.apply_filters)
         top_bar_1.addWidget(self.sort_box, stretch=1)
 
-        close_btn = QPushButton("KAPAT (F11)")
+        close_btn = QPushButton(i18n.t("gallery.close_button"))
         close_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        close_btn.setToolTip("Galeriyi kapat (F11)")
-        close_btn.setAccessibleName("Galeriyi Kapat")
+        close_btn.setToolTip(i18n.t("gallery.close_tooltip"))
+        close_btn.setAccessibleName(i18n.t("gallery.close_accessible_name"))
         close_btn.setStyleSheet("background: #d63031; color: white; padding: 10px 20px; border-radius: 6px; font-weight:bold; font-size: 11pt;")
         close_btn.clicked.connect(self.hide)
         top_bar_1.addWidget(close_btn)
 
-        settings_btn = QPushButton("⚙️ AYARLAR")
+        settings_btn = QPushButton(i18n.t("gallery.settings_button"))
         settings_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        settings_btn.setToolTip("Uygulama ayarlarını aç")
-        settings_btn.setAccessibleName("Ayarlar Menüsü")
-        settings_btn.setAccessibleDescription("OCR bölgesi, kısayol tuşları ve diğer ayarları değiştirin")
+        settings_btn.setToolTip(i18n.t("gallery.settings_tooltip"))
+        settings_btn.setAccessibleName(i18n.t("gallery.settings_accessible_name"))
+        settings_btn.setAccessibleDescription(i18n.t("gallery.settings_accessible_description"))
         settings_btn.setStyleSheet("background: #636e72; color: white; padding: 10px 20px; border-radius: 6px; font-weight:bold; font-size: 11pt;")
         settings_btn.clicked.connect(self.open_settings)
         top_bar_1.addWidget(settings_btn)
@@ -854,57 +859,57 @@ class GalleryWindow(QWidget):
         top_bar_2.setSpacing(15)
 
         self.class_box = QComboBox()
-        self.class_box.addItem("Tüm Sınıflar")
+        self.class_box.addItem(i18n.t("gallery.filter_all_classes"))
         self.class_box.addItems(self.all_classes)
-        self.class_box.setToolTip("Araçları sınıfına göre filtrele (Sports, Super, SUV vb.)")
-        self.class_box.setAccessibleName("Araç Sınıfı Filtresi")
+        self.class_box.setToolTip(i18n.t("gallery.filter_class_tooltip"))
+        self.class_box.setAccessibleName(i18n.t("gallery.filter_class_accessible_name"))
         self.class_box.currentTextChanged.connect(self.apply_filters)
         top_bar_2.addWidget(self.class_box)
 
         self.brand_box = QComboBox()
-        self.brand_box.addItem("Tüm Markalar")
+        self.brand_box.addItem(i18n.t("gallery.filter_all_brands"))
         self.brand_box.addItems(self.all_manufacturers)
-        self.brand_box.setToolTip("Araçları markasına göre filtrele")
-        self.brand_box.setAccessibleName("Marka Filtresi")
+        self.brand_box.setToolTip(i18n.t("gallery.filter_brand_tooltip"))
+        self.brand_box.setAccessibleName(i18n.t("gallery.filter_brand_accessible_name"))
         self.brand_box.currentTextChanged.connect(self.apply_filters)
         top_bar_2.addWidget(self.brand_box)
 
         self.vendor_box = QComboBox()
-        self.vendor_box.addItem("Tüm Satıcılar")
+        self.vendor_box.addItem(i18n.t("gallery.filter_all_vendors"))
         self.vendor_box.addItems(self.all_vendors)
-        self.vendor_box.setToolTip("Araçları satıcısına göre filtrele")
-        self.vendor_box.setAccessibleName("Satıcı Filtresi")
+        self.vendor_box.setToolTip(i18n.t("gallery.filter_vendor_tooltip"))
+        self.vendor_box.setAccessibleName(i18n.t("gallery.filter_vendor_accessible_name"))
         self.vendor_box.currentTextChanged.connect(self.apply_filters)
         top_bar_2.addWidget(self.vendor_box)
 
         # YENİ: Modifikasyon Filtresi
         self.mod_box = QComboBox()
-        self.mod_box.addItem("Tüm Atölyeler")
+        self.mod_box.addItem(i18n.t("gallery.filter_all_mods"))
         self.mod_box.addItems(self.all_mods)
-        self.mod_box.setToolTip("Araçları modifikasyon atölyesine göre filtrele")
-        self.mod_box.setAccessibleName("Atölye Filtresi")
+        self.mod_box.setToolTip(i18n.t("gallery.filter_mod_tooltip"))
+        self.mod_box.setAccessibleName(i18n.t("gallery.filter_mod_accessible_name"))
         self.mod_box.currentTextChanged.connect(self.apply_filters)
         top_bar_2.addWidget(self.mod_box)
 
-        self.armor_check = QCheckBox("Sadece Zırhlı")
+        self.armor_check = QCheckBox(i18n.t("gallery.filter_armored"))
         self.armor_check.setCursor(QCursor(Qt.PointingHandCursor))
-        self.armor_check.setToolTip("Sadece zırh özelliği olan araçları göster")
-        self.armor_check.setAccessibleName("Zırh Filtresi")
+        self.armor_check.setToolTip(i18n.t("gallery.filter_armored_tooltip"))
+        self.armor_check.setAccessibleName(i18n.t("gallery.filter_armored_accessible_name"))
         self.armor_check.stateChanged.connect(self.apply_filters)
         top_bar_2.addWidget(self.armor_check)
 
-        self.weapon_check = QCheckBox("Sadece Silahlı")
+        self.weapon_check = QCheckBox(i18n.t("gallery.filter_weaponized"))
         self.weapon_check.setCursor(QCursor(Qt.PointingHandCursor))
-        self.weapon_check.setToolTip("Sadece silah özelliği olan araçları göster")
-        self.weapon_check.setAccessibleName("Silah Filtresi")
+        self.weapon_check.setToolTip(i18n.t("gallery.filter_weaponized_tooltip"))
+        self.weapon_check.setAccessibleName(i18n.t("gallery.filter_weaponized_accessible_name"))
         self.weapon_check.stateChanged.connect(self.apply_filters)
         top_bar_2.addWidget(self.weapon_check)
 
         # Filtre Temizleme Butonu
-        clear_filters_btn = QPushButton("🔄 Filtreleri Temizle")
+        clear_filters_btn = QPushButton(i18n.t("gallery.clear_filters_button"))
         clear_filters_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        clear_filters_btn.setToolTip("Tüm filtreleri varsayılan değerlere döndür")
-        clear_filters_btn.setAccessibleName("Filtreleri Temizle")
+        clear_filters_btn.setToolTip(i18n.t("gallery.clear_filters_tooltip"))
+        clear_filters_btn.setAccessibleName(i18n.t("gallery.clear_filters_accessible_name"))
         clear_filters_btn.setStyleSheet(f"""
             QPushButton {{
                 background: {Theme.WARNING};
@@ -950,37 +955,37 @@ class GalleryWindow(QWidget):
         bottom_bar = QHBoxLayout()
 
         # Pagination Controls
-        self.prev_btn = QPushButton("<< ÖNCEKİ SAYFA")
+        self.prev_btn = QPushButton(i18n.t("gallery.prev_page_button"))
         self.prev_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.prev_btn.setToolTip("Önceki sayfaya git")
-        self.prev_btn.setAccessibleName("Önceki Sayfa")
+        self.prev_btn.setToolTip(i18n.t("gallery.prev_page_tooltip"))
+        self.prev_btn.setAccessibleName(i18n.t("gallery.prev_page_accessible_name"))
         self.prev_btn.setStyleSheet("background: #2b2b2b; color: white; padding: 10px 20px; border-radius: 6px; font-weight:bold; font-size: 11pt;")
         self.prev_btn.clicked.connect(lambda: self.change_page(-1))
         bottom_bar.addWidget(self.prev_btn)
 
         # İlk Sayfa Butonu
-        self.first_page_btn = QPushButton("|◀ İLK")
+        self.first_page_btn = QPushButton(i18n.t("gallery.first_page_button"))
         self.first_page_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.first_page_btn.setToolTip("İlk sayfaya git")
-        self.first_page_btn.setAccessibleName("İlk Sayfa")
+        self.first_page_btn.setToolTip(i18n.t("gallery.first_page_tooltip"))
+        self.first_page_btn.setAccessibleName(i18n.t("gallery.first_page_accessible_name"))
         self.first_page_btn.setStyleSheet("background: #2b2b2b; color: white; padding: 10px 15px; border-radius: 6px; font-weight:bold; font-size: 10pt;")
         self.first_page_btn.clicked.connect(lambda: self.go_to_page(0))
         bottom_bar.addWidget(self.first_page_btn)
 
-        self.page_label = QLabel("Sayfa 1 / 1")
-        self.page_label.setStyleSheet("color: #00FF96; font-weight: bold; font-size: 14pt;")
-        self.page_label.setAlignment(Qt.AlignCenter)
-        bottom_bar.addWidget(self.page_label)
+        self.page_lbl = QLabel(i18n.t("gallery.page_info", current=1, total=1))
+        self.page_lbl.setStyleSheet("color: #00FF96; font-weight: bold; font-size: 14pt;")
+        self.page_lbl.setAlignment(Qt.AlignCenter)
+        bottom_bar.addWidget(self.page_lbl)
 
         # Sayfa Numarası Input
         page_input_layout = QHBoxLayout()
-        page_input_label = QLabel("Sayfa:")
+        page_input_label = QLabel(i18n.t("gallery.page_input_label"))
         page_input_label.setStyleSheet("color: white; font-size: 10pt;")
         self.page_input = QSpinBox()
         self.page_input.setMinimum(1)
         self.page_input.setMaximum(1)
-        self.page_input.setToolTip("Belirli bir sayfaya git")
-        self.page_input.setAccessibleName("Sayfa Numarası")
+        self.page_input.setToolTip(i18n.t("gallery.page_input_tooltip"))
+        self.page_input.setAccessibleName(i18n.t("gallery.page_input_accessible_name"))
         self.page_input.setStyleSheet("""
             QSpinBox {
                 background: #2b2b2b;
@@ -997,18 +1002,18 @@ class GalleryWindow(QWidget):
         bottom_bar.addLayout(page_input_layout)
 
         # Son Sayfa Butonu
-        self.last_page_btn = QPushButton("SON ▶|")
+        self.last_page_btn = QPushButton(i18n.t("gallery.last_page_button"))
         self.last_page_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.last_page_btn.setToolTip("Son sayfaya git")
-        self.last_page_btn.setAccessibleName("Son Sayfa")
+        self.last_page_btn.setToolTip(i18n.t("gallery.last_page_tooltip"))
+        self.last_page_btn.setAccessibleName(i18n.t("gallery.last_page_accessible_name"))
         self.last_page_btn.setStyleSheet("background: #2b2b2b; color: white; padding: 10px 15px; border-radius: 6px; font-weight:bold; font-size: 10pt;")
         self.last_page_btn.clicked.connect(lambda: self.go_to_page(self.total_pages - 1))
         bottom_bar.addWidget(self.last_page_btn)
 
-        self.next_btn = QPushButton("SONRAKİ SAYFA >>")
+        self.next_btn = QPushButton(i18n.t("gallery.next_page_button"))
         self.next_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.next_btn.setToolTip("Sonraki sayfaya git")
-        self.next_btn.setAccessibleName("Sonraki Sayfa")
+        self.next_btn.setToolTip(i18n.t("gallery.next_page_tooltip"))
+        self.next_btn.setAccessibleName(i18n.t("gallery.next_page_accessible_name"))
         self.next_btn.setStyleSheet("background: #00FF96; color: black; padding: 10px 20px; border-radius: 6px; font-weight:bold; font-size: 11pt;")
         self.next_btn.clicked.connect(lambda: self.change_page(1))
         bottom_bar.addWidget(self.next_btn)
@@ -1027,7 +1032,7 @@ class GalleryWindow(QWidget):
 
         top_bar = QHBoxLayout()
 
-        back_btn = QPushButton("<< GALERİYE DÖN")
+        back_btn = QPushButton(i18n.t("detail.back_to_gallery"))
 
         back_btn.setCursor(QCursor(Qt.PointingHandCursor))
 
@@ -1116,15 +1121,27 @@ class GalleryWindow(QWidget):
                     continue
 
             
+            # Eğer veri yoksa boş kart
+            if not car:
+                brand_label = QLabel(i18n.t("card.db_missing"))
+                brand_label.setStyleSheet(f"color: {Theme.ERROR}; font-weight: bold;")
+                # This part of the code is inside a loop that iterates through `self.db_data`.
+                # Adding a QLabel directly to the layout here would add it for each missing car,
+                # which is not the intended behavior.
+                # The original code had this block, but it was misplaced.
+                # It should be handled outside the loop or in a dedicated "no results" section.
+                # For now, I'm commenting it out to avoid breaking the layout.
+                # layout.addWidget(brand_label)
+                continue
 
             match_query = query in car.get("Vehicle Name", "").lower()
 
-            match_class = (v_class == "Tüm Sınıflar") or (v_class == car.get("Vehicle Class", ""))
+            match_class = (v_class == i18n.t("gallery.filter_all_classes")) or (v_class == car.get("Vehicle Class", ""))
 
-            match_brand = (brand == "Tüm Markalar") or (brand == car.get("Manufacturer", ""))
+            match_brand = (brand == i18n.t("gallery.filter_all_brands")) or (brand == car.get("Manufacturer", ""))
 
-            match_vendor = (vendor == "Tüm Satıcılar") or (vendor == car.get("Acquisition", ""))
-            match_mod = (mod_type == "Tüm Atölyeler") or (mod_type in str(car.get("Modifications", "")))
+            match_vendor = (vendor == i18n.t("gallery.filter_all_vendors")) or (vendor == car.get("Acquisition", ""))
+            match_mod = (mod_type == i18n.t("gallery.filter_all_mods")) or (mod_type in str(car.get("Modifications", "")))
             match_armor = True
             if req_armor: match_armor = "Yes" in str(car.get("Bulletproof", ""))
             match_weapon = True
@@ -1135,25 +1152,16 @@ class GalleryWindow(QWidget):
                 self.filtered_data.append(car)
 
         
-
-        if sort_mode == "Fiyat: Önce En Pahalı":
-
+        if sort_mode == i18n.t("gallery.sort_price_desc"):
             self.filtered_data.sort(key=lambda x: parse_number(x.get("GTA Online Price", "0")), reverse=True)
-
-        elif sort_mode == "Fiyat: Önce En Ucuz":
-
+        elif sort_mode == i18n.t("gallery.sort_price_asc"):
             self.filtered_data.sort(key=lambda x: parse_number(x.get("GTA Online Price", "0")))
-
-        elif sort_mode == "Hız: En Hızlılar":
-
+        elif sort_mode == i18n.t("gallery.sort_speed_desc"):
             self.filtered_data.sort(key=lambda x: parse_number(x.get("Top Speed (Broughy)", "0")), reverse=True)
-
-        elif sort_mode == "İvme: En Yüksek Kalkış":
-
+        elif sort_mode == i18n.t("gallery.sort_accel_desc"):
             self.filtered_data.sort(key=lambda x: parse_number(x.get("Stat - Acceleration", "0")), reverse=True)
 
         
-
         self.current_page = 0
 
         self.load_page()
@@ -1175,7 +1183,7 @@ class GalleryWindow(QWidget):
         if self.current_page < 0:
             self.current_page = 0
 
-        self.page_label.setText(f"Sayfa {self.current_page + 1} / {self.total_pages}")
+        self.page_lbl.setText(i18n.t("gallery.page_info", current=self.current_page, total=self.total_pages))
 
         # Butonları enable/disable
         self.prev_btn.setEnabled(self.current_page > 0)
@@ -1361,7 +1369,7 @@ class GalleryWindow(QWidget):
         layout.setSpacing(15)
 
         # Başlık
-        title = QLabel("📊 GARAJ ANALİTİKLERİ")
+        title = QLabel(i18n.t("analytics.title"))
         title.setAlignment(Qt.AlignCenter)
         title.setFont(QFont("Segoe UI", 18, QFont.Bold))
         title.setStyleSheet("color: #00FF96;")
@@ -1379,7 +1387,7 @@ class GalleryWindow(QWidget):
         layout.addWidget(scroll)
 
         # Geri Butonu
-        back_btn = QPushButton("⬅ MAĞAZAYA DÖN")
+        back_btn = QPushButton(i18n.t("analytics.back_to_store"))
         back_btn.setCursor(QCursor(Qt.PointingHandCursor))
         back_btn.setStyleSheet("background: #636e72; color: white; padding: 10px; font-weight: bold; border-radius: 6px; font-size: 11pt;")
         back_btn.clicked.connect(lambda: self.switch_tab("STORE"))
@@ -1403,15 +1411,15 @@ class GalleryWindow(QWidget):
         summary_layout = QGridLayout(summary_frame)
 
         stats = [
-            ("🏎️ Toplam Araç", str(len(garage)), "#00FF96"),
-            ("💰 Toplam Değer", f"${total_value:,.0f}", "#fdcb6e"),
+            (i18n.t("analytics.total_vehicles"), str(len(garage)), "#00FF96"),
+            (i18n.t("analytics.total_value"), f"${total_value:,.0f}", "#fdcb6e"),
         ]
 
         if garage_vehicles:
             most_expensive = max(garage_vehicles, key=lambda v: parse_number(v.get("GTA Online Price", "0")))
             fastest = max(garage_vehicles, key=lambda v: parse_number(v.get("Top Speed (Broughy)", "0")))
-            stats.append(("💵 En Pahalı", most_expensive.get("Vehicle Name", ""), "#e17055"))
-            stats.append(("⚡ En Hızlı", fastest.get("Vehicle Name", ""), "#74b9ff"))
+            stats.append((i18n.t("analytics.most_expensive"), most_expensive.get("Vehicle Name", ""), "#e17055"))
+            stats.append((i18n.t("analytics.fastest"), fastest.get("Vehicle Name", ""), "#74b9ff"))
 
         for i, (label_text, value_text, color) in enumerate(stats):
             lbl = QLabel(f"<span style='color: {Theme.TEXT_SECONDARY}; font-size: 10pt;'>{label_text}</span><br>"
@@ -1426,7 +1434,7 @@ class GalleryWindow(QWidget):
         class_frame.setStyleSheet("background: #2d3436; border-radius: 10px; padding: 15px;")
         class_layout = QVBoxLayout(class_frame)
 
-        class_title = QLabel("📊 Sınıf Dağılımı")
+        class_title = QLabel(i18n.t("analytics.class_distribution"))
         class_title.setFont(QFont("Segoe UI", 12, QFont.Bold))
         class_title.setStyleSheet("color: #00FF96; margin-bottom: 10px;")
         class_layout.addWidget(class_title)
@@ -1434,7 +1442,7 @@ class GalleryWindow(QWidget):
         # Sınıf sayılarını hesapla
         class_counts = {}
         for v in garage_vehicles:
-            vc = v.get("Vehicle Class", "Bilinmiyor")
+            vc = v.get("Vehicle Class", i18n.t("analytics.unknown_class"))
             class_counts[vc] = class_counts.get(vc, 0) + 1
 
         # En çoktan aza sırala
@@ -1474,7 +1482,7 @@ class GalleryWindow(QWidget):
             missing_frame.setStyleSheet("background: #2d3436; border-radius: 10px; padding: 15px;")
             missing_layout = QVBoxLayout(missing_frame)
 
-            missing_title = QLabel(f"❌ Eksik Sınıflar ({len(missing)})")
+            missing_title = QLabel(i18n.t("analytics.missing_classes").format(count=len(missing)))
             missing_title.setFont(QFont("Segoe UI", 12, QFont.Bold))
             missing_title.setStyleSheet("color: #d63031; margin-bottom: 10px;")
             missing_layout.addWidget(missing_title)
@@ -1498,7 +1506,7 @@ class GalleryWindow(QWidget):
         layout.setSpacing(15)
 
         # Başlık
-        title = QLabel("🕐 SON GÖRÜLEN ARAÇLAR")
+        title = QLabel(i18n.t("history.title"))
         title.setAlignment(Qt.AlignCenter)
         title.setFont(QFont("Segoe UI", 18, QFont.Bold))
         title.setStyleSheet("color: #00FF96;")
@@ -1522,7 +1530,7 @@ class GalleryWindow(QWidget):
         layout.addWidget(scroll)
 
         # Geri Butonu
-        back_btn = QPushButton("⬅ MAĞAZAYA DÖN")
+        back_btn = QPushButton(i18n.t("history.back_to_store"))
         back_btn.setCursor(QCursor(Qt.PointingHandCursor))
         back_btn.setStyleSheet("background: #636e72; color: white; padding: 10px; font-weight: bold; border-radius: 6px; font-size: 11pt;")
         back_btn.clicked.connect(lambda: self.switch_tab("STORE"))
@@ -1537,26 +1545,26 @@ class GalleryWindow(QWidget):
             if w: w.deleteLater()
 
         if not self.vehicle_history:
-            empty = QLabel("Henüz hiç araç tespit edilmedi.")
+            empty = QLabel(i18n.t("history.no_vehicles_detected"))
             empty.setAlignment(Qt.AlignCenter)
             empty.setStyleSheet("color: #636e72; font-size: 14pt; padding: 40px;")
             self.history_layout.addWidget(empty)
-            self.history_stats_label.setText("📊 Henüz veri yok")
+            self.history_stats_label.setText(i18n.t("history.no_data_yet"))
             return
 
         stats = self.vehicle_history.get_stats()
         recent = self.vehicle_history.get_recent(20)
 
         # İstatistik
-        most_seen_text = f" | 🎯 En çok: {stats['most_seen']} ({stats['most_seen_count']}x)" if stats['most_seen'] else ""
+        most_seen_text = f" | 🎯 {i18n.t('history.most_seen')}: {stats['most_seen']} ({stats['most_seen_count']}x)" if stats['most_seen'] else ""
         self.history_stats_label.setText(
-            f"📊 Bugün: <span style='color:#00FF96;'>{stats['daily']}</span> araç | "
-            f"Toplam: <span style='color:#fdcb6e;'>{stats['total']}</span> tespit | "
-            f"Benzersiz: <span style='color:#74b9ff;'>{stats['unique']}</span>{most_seen_text}"
+            f"📊 {i18n.t('history.today')}: <span style='color:#00FF96;'>{stats['daily']}</span> {i18n.t('history.vehicle')} | "
+            f"{i18n.t('history.total')}: <span style='color:#fdcb6e;'>{stats['total']}</span> {i18n.t('history.detection')} | "
+            f"{i18n.t('history.unique')}: <span style='color:#74b9ff;'>{stats['unique']}</span>{most_seen_text}"
         )
 
         if not recent:
-            empty = QLabel("Henüz hiç araç tespit edilmedi.")
+            empty = QLabel(i18n.t("history.no_vehicles_detected"))
             empty.setAlignment(Qt.AlignCenter)
             empty.setStyleSheet("color: #636e72; font-size: 14pt; padding: 40px;")
             self.history_layout.addWidget(empty)
@@ -1734,7 +1742,7 @@ class StatusHUD(QWidget):
         self.inner_layout.addWidget(dot)
 
         # OCR Durumu
-        self.lbl_ocr = QLabel("OCR: AÇIK")
+        self.lbl_ocr = QLabel(i18n.t("hud.ocr_on"))
         self.lbl_ocr.setStyleSheet("color: white; font-weight: bold; font-family: 'Segoe UI'; font-size: 9pt;")
         self.inner_layout.addWidget(self.lbl_ocr)
 
@@ -1749,6 +1757,7 @@ class StatusHUD(QWidget):
         self.update_shortcut_text()
 
     def update_shortcut_text(self):
+        """Config'den kısayol tuşlarını okuyup arayüzü günceller."""
         try:
             cfg = load_config()
             hk = cfg.get("hotkeys", {}).get("toggle_ocr", "F10").upper()
@@ -1760,7 +1769,7 @@ class StatusHUD(QWidget):
         self.update_shortcut_text()
         
         if ocr_active:
-            self.lbl_ocr.setText("OCR: AÇIK")
+            self.lbl_ocr.setText(i18n.t("hud.ocr_on"))
             self.lbl_ocr.setStyleSheet("color: white; font-weight: bold; font-size: 9pt;")
             self.frame.setStyleSheet("""
                 background-color: rgba(15, 15, 15, 230); 
@@ -1769,7 +1778,7 @@ class StatusHUD(QWidget):
             """)
             self.lbl_jarvis.setStyleSheet("color: #00FF96; font-weight: 900; font-size: 10pt;")
         else:
-            self.lbl_ocr.setText("OCR: KAPALI")
+            self.lbl_ocr.setText(i18n.t("hud.ocr_off"))
             self.lbl_ocr.setStyleSheet("color: #ff7675; font-weight: bold; font-size: 9pt;")
             self.frame.setStyleSheet("""
                 background-color: rgba(15, 15, 15, 230); 
@@ -2014,22 +2023,31 @@ class InteractiveSnipper(QWidget):
             QPushButton#cancel:hover { background-color: #ff7675; }
         """)
         
-        layout = QHBoxLayout(self.control_panel)
+        layout = QVBoxLayout(self.control_panel)
         layout.setContentsMargins(20, 15, 20, 15)
-        layout.setSpacing(30)
+        layout.setSpacing(15)
         
-        btn_confirm = QPushButton("✅ ONAYLA")
+        # Talimat
+        self.lbl_instruction = QLabel(i18n.t("snipper.instruction"))
+        self.lbl_instruction.setStyleSheet("color: white; font-weight: bold; font-size: 14px;")
+        self.lbl_instruction.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.lbl_instruction)
+        
+        # Butonlar
+        btn_confirm = QPushButton(i18n.t("snipper.confirm_button"))
         btn_confirm.setObjectName("confirm")
         btn_confirm.setCursor(Qt.PointingHandCursor)
         btn_confirm.clicked.connect(self.finish_selection)
         
-        btn_cancel = QPushButton("❌ İPTAL")
+        btn_cancel = QPushButton(i18n.t("snipper.cancel_button"))
         btn_cancel.setObjectName("cancel")
         btn_cancel.setCursor(Qt.PointingHandCursor)
         btn_cancel.clicked.connect(self.close)
         
-        layout.addWidget(btn_confirm)
-        layout.addWidget(btn_cancel)
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(btn_confirm)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout)
         
         self.control_panel.adjustSize()
 
@@ -2170,7 +2188,7 @@ class SettingsWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__()
         self.parent_window = parent
-        self.setWindowTitle("Ayarlar")
+        self.setWindowTitle(i18n.t("settings.title"))
         
         # 1. Ekran boyutlarını al
         screen = QApplication.primaryScreen().availableGeometry()
@@ -2320,7 +2338,7 @@ class SettingsWindow(QWidget):
         self.setLayout(main_layout)
         
         # Başlık
-        title = QLabel("⚙️ AYARLAR")
+        title = QLabel(i18n.t("settings.title"))
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 16pt; font-weight: bold; color: #00FF96;")
         main_layout.addWidget(title)
@@ -2337,45 +2355,44 @@ class SettingsWindow(QWidget):
         content_layout.setSpacing(15)
 
         # --- GENEL AYARLAR (QGroupBox) ---
-        general_group = QGroupBox("Genel Ayarlar")
+        general_group = QGroupBox(i18n.t("settings.general_settings"))
         general_layout = QFormLayout()
         general_layout.setSpacing(10)
         general_layout.setLabelAlignment(Qt.AlignLeft)
         
         # OCR Motor Bilgisi
-        # OCR Motor Bilgisi
         engine = get_ocr_engine()
         if engine == "winocr":
-            ocr_info = QLabel("✅ Windows OCR (yerleşik)")
+            ocr_info = QLabel(i18n.t("settings.ocr_engine_winocr"))
             ocr_info.setStyleSheet("color: #00FF96; font-weight: bold;")
         else:
-            ocr_info = QLabel("⚙️ Tesseract OCR")
+            ocr_info = QLabel(i18n.t("settings.ocr_engine_tesseract"))
             ocr_info.setStyleSheet("color: #f0ad4e; font-weight: bold;")
-        general_layout.addRow("OCR Motoru:", ocr_info)
+        general_layout.addRow(i18n.t("settings.ocr_engine_label"), ocr_info)
         
         # Kısayollar
         self.hk_gallery = QLineEdit()
-        self.hk_gallery.setPlaceholderText("Örn: f11")
-        general_layout.addRow("Galeri Tuşu:", self.hk_gallery)
+        self.hk_gallery.setPlaceholderText(i18n.t("settings.hotkey_placeholder"))
+        general_layout.addRow(i18n.t("settings.hotkey_gallery"), self.hk_gallery)
         
         self.hk_ownership = QLineEdit()
-        self.hk_ownership.setPlaceholderText("Örn: f9")
-        general_layout.addRow("Garaj Tuşu:", self.hk_ownership)
+        self.hk_ownership.setPlaceholderText(i18n.t("settings.hotkey_placeholder"))
+        general_layout.addRow(i18n.t("settings.hotkey_ownership"), self.hk_ownership)
 
         self.hk_ocr = QLineEdit()
-        self.hk_ocr.setPlaceholderText("Örn: f10")
-        general_layout.addRow("OCR Aç/Kapa:", self.hk_ocr)
+        self.hk_ocr.setPlaceholderText(i18n.t("settings.hotkey_placeholder"))
+        general_layout.addRow(i18n.t("settings.hotkey_ocr"), self.hk_ocr)
         
         general_group.setLayout(general_layout)
         content_layout.addWidget(general_group)
         
         # --- OCR AYARLARI (QGroupBox) ---
-        ocr_group = QGroupBox("OCR Tarama Bölgesi (SOL ÜST)")
+        ocr_group = QGroupBox(i18n.t("settings.ocr_region_group"))
         ocr_layout = QFormLayout() 
         ocr_layout.setSpacing(10)
         
         # Bölge Seç Butonu
-        self.snip_btn = QPushButton("🖱️ OCR ALANI SEÇ")
+        self.snip_btn = QPushButton(i18n.t("settings.select_ocr_area"))
         self.snip_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.snip_btn.setStyleSheet("background: #e17055; color: white;")
         self.snip_btn.clicked.connect(self.start_snip)
@@ -2383,27 +2400,27 @@ class SettingsWindow(QWidget):
         
         # Koordinatlar
         self.ocr_left = QSpinBox(); self.ocr_left.setRange(0, 5000)
-        ocr_layout.addRow("Sol (X):", self.ocr_left)
+        ocr_layout.addRow(i18n.t("settings.left_x"), self.ocr_left)
         
         self.ocr_top = QSpinBox(); self.ocr_top.setRange(0, 5000)
-        ocr_layout.addRow("Üst (Y):", self.ocr_top)
+        ocr_layout.addRow(i18n.t("settings.top_y"), self.ocr_top)
         
         self.ocr_width = QSpinBox(); self.ocr_width.setRange(50, 5000)
-        ocr_layout.addRow("Genişlik:", self.ocr_width)
+        ocr_layout.addRow(i18n.t("settings.width"), self.ocr_width)
         
         self.ocr_height = QSpinBox(); self.ocr_height.setRange(10, 2000)
-        ocr_layout.addRow("Yükseklik:", self.ocr_height)
+        ocr_layout.addRow(i18n.t("settings.height"), self.ocr_height)
         
         ocr_group.setLayout(ocr_layout)
         content_layout.addWidget(ocr_group)
 
         # --- HUD AYARLARI (QGroupBox) ---
-        hud_group = QGroupBox("HUD Bilgi Penceresi (SAĞ ÜST)")
+        hud_group = QGroupBox(i18n.t("settings.hud_window_group"))
         hud_layout = QFormLayout()
         hud_layout.setSpacing(10)
 
         # HUD Seç Butonu
-        self.hud_snip_btn = QPushButton("🖱️ HUD KONUMU SEÇ")
+        self.hud_snip_btn = QPushButton(i18n.t("settings.select_hud_position"))
         self.hud_snip_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.hud_snip_btn.setStyleSheet("background: #0984e3; color: white;")
         self.hud_snip_btn.clicked.connect(self.start_hud_snip)
@@ -2411,17 +2428,17 @@ class SettingsWindow(QWidget):
 
         # Koordinatlar
         self.hud_left = QSpinBox(); self.hud_left.setRange(-1, 5000) # -1: Otomatik Sağ
-        self.hud_left.setSpecialValueText("Oto (Sağ)")
-        hud_layout.addRow("Sol (X):", self.hud_left)
+        self.hud_left.setSpecialValueText(i18n.t("settings.auto_right"))
+        hud_layout.addRow(i18n.t("settings.left_x"), self.hud_left)
 
         self.hud_top = QSpinBox(); self.hud_top.setRange(0, 5000)
-        hud_layout.addRow("Üst (Y):", self.hud_top)
+        hud_layout.addRow(i18n.t("settings.top_y"), self.hud_top)
         
         self.hud_width = QSpinBox(); self.hud_width.setRange(50, 5000)
-        hud_layout.addRow("Genişlik:", self.hud_width)
+        hud_layout.addRow(i18n.t("settings.width"), self.hud_width)
         
         self.hud_height = QSpinBox(); self.hud_height.setRange(10, 2000)
-        hud_layout.addRow("Max Yükseklik:", self.hud_height) 
+        hud_layout.addRow(i18n.t("settings.max_height"), self.hud_height) 
 
         hud_group.setLayout(hud_layout)
         content_layout.addWidget(hud_group)
@@ -2430,13 +2447,13 @@ class SettingsWindow(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(15)
         
-        save_btn = QPushButton("KAYDET")
+        save_btn = QPushButton(i18n.t("settings.save_button"))
         save_btn.setCursor(QCursor(Qt.PointingHandCursor))
         save_btn.setStyleSheet("background: #00FF96; color: #2d3436; font-weight: bold; padding: 10px; font-size: 11pt;")
         save_btn.clicked.connect(self.save_settings)
         btn_layout.addWidget(save_btn)
         
-        cancel_btn = QPushButton("İPTAL")
+        cancel_btn = QPushButton(i18n.t("settings.cancel_button"))
         cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
         cancel_btn.setStyleSheet("background: #d63031; color: white; font-weight: bold; padding: 10px; font-size: 11pt;")
         cancel_btn.clicked.connect(self.close)
@@ -2444,7 +2461,7 @@ class SettingsWindow(QWidget):
         
         main_layout.addLayout(btn_layout)
         
-        self.info_label = QLabel("Ayarlar kaydedildikten sonra yeniden başlatma gerekir.")
+        self.info_label = QLabel(i18n.t("settings.restart_warning"))
         self.info_label.setStyleSheet("color: #b2bec3; font-size: 9pt; margin-top: 5px;")
         self.info_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.info_label)
