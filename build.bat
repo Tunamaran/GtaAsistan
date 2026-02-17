@@ -8,6 +8,16 @@ echo.
 echo ========================================
 echo   GTA Asistan - Build Baslatiliyor
 echo ========================================
+
+REM Version update
+echo [0/7] Surum guncelleniyor...
+python update_version.py
+if errorlevel 1 (
+    echo HATA: Version guncelleme basarisiz!
+    pause
+    exit /b 1
+)
+
 echo.
 
 REM Eski build dosyalarini temizle

@@ -8,6 +8,9 @@ import tempfile
 from typing import Dict, Any
 import logging
 
+
+VERSION = "17022026.01"
+
 def setup_logging():
     """Loglama yapılandırmasını başlatır."""
     # Program Files gibi korumalı dizinlere yazmaya çalışırsak hata alırız.
@@ -31,7 +34,7 @@ def setup_logging():
     logging.getLogger("mss").setLevel(logging.WARNING)
 
     logging.info("==========================================")
-    logging.info(f"GTA Asistan Başlatılıyor... (v1.0)")
+    logging.info(f"GTA Asistan Başlatılıyor... (v{VERSION})")
     logging.info(f"App Dir: {APP_DIR}")
     logging.info(f"Log Dir: {log_dir}")
     logging.info("==========================================")
