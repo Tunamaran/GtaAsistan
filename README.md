@@ -33,7 +33,7 @@ Ekrandaki araç isimlerini gerçek zamanlı olarak okur ve detaylı bilgileri ov
 
 ### Adım 1: Installer'ı İndir
 ```
-GtaAsistan_Setup_v1.0.0.exe
+[Son Sürümü İndir](https://github.com/tunamaran/GtaAsistan/releases/latest)
 ```
 
 ### Adım 2: Kur ve Çalıştır
@@ -69,9 +69,11 @@ Installer aşağıdakileri otomatik kurar:
 
 ### Asistan (Oyun İçi)
 1. **GTA V'yi başlatın.**
-2. Araç satın alma sitesine girin veya bir araç isminin göründüğü menüyü açın.
-3. Fare imlecini araç isminin üzerine getirin.
+2. **Mekanik**, **Pegasus** veya **Etkileşim Menüsü (Interaction Menu)** gibi araç listesi olan menüleri açın.
+3. Menüdeki yön tuşları veya butonlar ile araç isminin üzerine gelin.
 4. **Otomatik bilgi kartı** ekranda belirecektir.
+
+> **Not:** Araç satın alma sitelerinde çalışmaz. Sadece oyun içi menülerde aktiftir.
 
 ### Kısayollar
 - **F9**: Garaj yönetimi (Aracı garajınıza ekler/çıkarır).
@@ -114,6 +116,17 @@ Detaylı dokümantasyon için: [INSTALL.md](INSTALL.md)
 - **İnternet Bağlantısı** (İlk kurulum ve Windows OCR indirimi için önerilir)
 - **~300MB Disk Alanı**
 
+## 📸 Ekran Görüntüleri
+
+| Görünüm 1 | Görünüm 2 |
+|:---:|:---:|
+| ![Ekran Görüntüsü 1](docs/images/screenshot1.png) | ![Ekran Görüntüsü 2](docs/images/screenshot2.png) |
+
+| Görünüm 3 | Görünüm 4 |
+|:---:|:---:|
+| ![Ekran Görüntüsü 3](docs/images/screenshot3.png) | ![Ekran Görüntüsü 4](docs/images/screenshot4.png) |
+
+
 ## 🤝 Katkıda Bulunma
 
 Pull request'ler kabul edilir! Büyük değişiklikler için lütfen önce Issue açarak tartışın.
@@ -121,6 +134,14 @@ Pull request'ler kabul edilir! Büyük değişiklikler için lütfen önce Issue
 ## 📄 Lisans
 
 Bu proje herhangi bir özel lisans altında değildir.
+
+## 🙏 Teşekkürler
+
+Bu projenin geliştirilmesinde emeği geçen herkese teşekkürler.
+
+- [GTABase](https://www.gtabase.com/) - Araç verileri için
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) - OCR motoru için
+- [TheFuzz](https://github.com/seatgeek/thefuzz) - Bulanık eşleşme algoritması için
 
 ---
 
@@ -149,7 +170,7 @@ Real-time vehicle name recognition via OCR, displaying detailed information via 
 
 ### Step 1: Download Installer
 ```
-GtaAsistan_Setup_v1.0.0.exe
+[Download Latest Release](https://github.com/tunamaran/GtaAsistan/releases/latest)
 ```
 
 ### Step 2: Install & Run
@@ -185,9 +206,11 @@ The installer automatically sets up:
 
 ### Assistant (In-Game)
 1. **Start GTA V.**
-2. Open a vehicle purchase website or any menu showing vehicle names.
-3. Hover your mouse over the vehicle name.
+2. Open menus like **Mechanic**, **Pegasus**, or **Interaction Menu** where vehicle lists appear.
+3. Navigate to the vehicle name using menu buttons/keys.
 4. The **info card overlay** will appear automatically.
+
+> **Note:** Does not work on vehicle purchase websites. Only active in in-game menus.
 
 ### Shortcuts
 - **F9**: Garage management (Add/Remove vehicle from your garage).
@@ -230,6 +253,17 @@ See docs: [INSTALL.md](INSTALL.md)
 - **Internet Connection** (Recommended for initial setup and Windows OCR)
 - **~300MB Disk Space**
 
+## 📸 Screenshots
+
+| View 1 | View 2 |
+|:---:|:---:|
+| ![Screenshot 1](docs/images/screenshot1.png) | ![Screenshot 2](docs/images/screenshot2.png) |
+
+| View 3 | View 4 |
+|:---:|:---:|
+| ![Screenshot 3](docs/images/screenshot3.png) | ![Screenshot 4](docs/images/screenshot4.png) |
+
+
 ## 🤝 Contributing
 
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
@@ -237,6 +271,14 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 ## 📄 License
 
 This project is not under any specific license.
+
+## 🙏 Acknowledgements
+
+Thanks to everyone who contributed to the development of this project.
+
+- [GTABase](https://www.gtabase.com/) - For vehicle data
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) - For OCR engine
+- [TheFuzz](https://github.com/seatgeek/thefuzz) - For fuzzy matching algorithm
 
 ---
 
