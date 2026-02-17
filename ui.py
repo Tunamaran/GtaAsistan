@@ -22,6 +22,10 @@ from config import load_config, save_config
 from database import get_smart_badges, get_vehicle_advice, parse_number, load_garage, get_garage_stats, toggle_vehicle_ownership
 from workers import ImageLoaderThread, get_ocr_engine
 import logging
+import ctypes
+from ctypes.wintypes import MSG
+from ctypes import c_long, c_int, c_short
+
 
 # ==========================================
 # THEME & DESIGN SYSTEM
@@ -196,73 +200,10 @@ class FlowLayout(QLayout):
 # ==========================================
 # FRAMELESS RESIZER (Çerçevesiz Pencereler İçin)
 # ==========================================
-class FramelessResizer:
-    def __init__(self, window):
-        self.window = window
-        self.window.setMouseTracking(True)
-        self.margin = 10
-        self._is_resizing = False
-        self._is_dragging = False
-        self._drag_pos = None
-        self._resize_dir = None
+# ==========================================
+# (Eski FramelessResizer Kaldırıldı)
+# ==========================================
 
-    def handle_mouse_press(self, event):
-        if event.button() == Qt.LeftButton:
-            pos = event.pos()
-            edge = self.get_edge(pos)
-            if edge:
-                self._is_resizing = True
-                self._resize_dir = edge
-            else:
-                self._is_dragging = True
-                self._drag_pos = event.globalPos() - self.window.frameGeometry().topLeft()
-            event.accept()
-
-    def handle_mouse_move(self, event):
-        pos = event.pos()
-        if self._is_resizing:
-            self.resize_window(event.globalPos())
-        elif self._is_dragging:
-            self.window.move(event.globalPos() - self._drag_pos)
-        else:
-            edge = self.get_edge(pos)
-            self.update_cursor(edge)
-
-    def handle_mouse_release(self, event):
-        self._is_resizing = False
-        self._is_dragging = False
-        self.window.unsetCursor()
-
-    def get_edge(self, pos):
-        w, h = self.window.width(), self.window.height()
-        x, y = pos.x(), pos.y()
-        m = self.margin
-        
-        edge = ""
-        if y < m: edge += "T"
-        elif y > h - m: edge += "B"
-        if x < m: edge += "L"
-        elif x > w - m: edge += "R"
-        return edge if edge else None
-
-    def update_cursor(self, edge):
-        if edge in ("TL", "BR"): self.window.setCursor(Qt.SizeFDiagCursor)
-        elif edge in ("TR", "BL"): self.window.setCursor(Qt.SizeBDiagCursor)
-        elif edge in ("T", "B"): self.window.setCursor(Qt.SizeVerCursor)
-        elif edge in ("L", "R"): self.window.setCursor(Qt.SizeHorCursor)
-        else: self.window.unsetCursor()
-
-    def resize_window(self, global_pos):
-        rect = self.window.geometry()
-        m_pos = global_pos
-        
-        if "L" in self._resize_dir: rect.setLeft(m_pos.x())
-        if "R" in self._resize_dir: rect.setRight(m_pos.x())
-        if "T" in self._resize_dir: rect.setTop(m_pos.y())
-        if "B" in self._resize_dir: rect.setBottom(m_pos.y())
-        
-        if rect.width() > 400 and rect.height() > 300:
-            self.window.setGeometry(rect)
 
 # ==========================================
 # 1. KART TASARIMI (SENİN KODUN - DOKUNULMADI)
@@ -514,8 +455,8 @@ class GalleryWindow(QWidget):
         
         self.setGeometry(left, top, width, height)
         
-        # Resizer'ı başlat
-        self.resizer = FramelessResizer(self)
+        # Resizer'ı başlat (Devre dışı bırakıldı - Native resize kullanılıyor)
+        # self.resizer = FramelessResizer(self)
 
         self.setStyleSheet("""
             QWidget { font-family: 'Segoe UI', sans-serif; }
@@ -578,7 +519,7 @@ class GalleryWindow(QWidget):
         
         # Mouse tracking her yerde aktif
         self.setMouseTracking(True)
-        self.bg_frame.setMouseTracking(True)
+        # self.bg_frame.setMouseTracking(True) # Kaldırıldı: Native resize'ı engelleyebilir
         
         self.bg_layout = QVBoxLayout(self.bg_frame)
         self.bg_layout.setContentsMargins(25, 25, 25, 25)
@@ -625,21 +566,68 @@ class GalleryWindow(QWidget):
             QTimer.singleShot(50, self.load_page) 
 
     def mousePressEvent(self, event):
-        # Sadece sol tuş ile resize/drag
-        if event.button() == Qt.LeftButton:
-            self.resizer.handle_mouse_press(event)
-        else:
-            # Sağ tuş veya diğer butonlar için varsayılan davranış
-            super().mousePressEvent(event)
+        # Native resize kullanıldığı için buraya gerek kalmadı
+        super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event):
-        self.resizer.handle_mouse_move(event)
+    # def mouseMoveEvent(self, event):
+    #     self.resizer.handle_mouse_move(event)
 
     def mouseReleaseEvent(self, event):
         # Her zaman resizer'ı bilgilendir (flag temizleme için)
-        self.resizer.handle_mouse_release(event)
+        # self.resizer.handle_mouse_release(event)
         if event.button() != Qt.LeftButton:
             super().mouseReleaseEvent(event)
+
+    def nativeEvent(self, eventType, message):
+        """Windows Native Resize Handler (WM_NCHITTEST)"""
+        if eventType == "windows_generic_MSG":
+            # sip.voidptr -> int conversion
+            msg = ctypes.cast(int(message), ctypes.POINTER(MSG)).contents
+            
+            if msg.message == 0x0084: # WM_NCHITTEST
+                x = c_short(msg.lParam & 0xFFFF).value
+                y = c_short((msg.lParam >> 16) & 0xFFFF).value
+                
+                # Global koordinatları pencere koordinatlarına çevir
+                pt = self.mapFromGlobal(QPoint(x, y))
+                
+                w, h = self.width(), self.height()
+                lx = pt.x()
+                ly = pt.y()
+                
+                # Resize Kenar Boşluğu (Genişletildi - 24px)
+                border_width = 24
+                title_height = 50 # Üst kısımdan sürükleme alanı
+                
+                # Kenar Kontrolleri
+                left = lx < border_width
+                right = lx > w - border_width
+                top = ly < border_width
+                bottom = ly > h - border_width
+                
+                if top and left: return True, 13 # HTTOPLEFT
+                if top and right: return True, 14 # HTTOPRIGHT
+                if bottom and left: return True, 16 # HTBOTTOMLEFT
+                if bottom and right: return True, 17 # HTBOTTOMRIGHT
+                if left: return True, 10 # HTLEFT
+                if right: return True, 11 # HTRIGHT
+                if top: return True, 12 # HTTOP
+                if bottom: return True, 15 # HTBOTTOM
+
+                
+                # Başlık çubuğu davranışı (Sürükleme)
+                # Üst kısımda ise ve butonların olduğu bölge (sağ üst) değilse
+                # Basitçe üst 50px DRAG alanı olsun
+                if ly < title_height:
+                    # Child widget'ın (buton vs) üzerinde miyiz kontrolü PyQt tarafından yapılır
+                    # Ancak nativeEvent önce çalışır. Yine de childAt ile kontrol edebiliriz
+                    # child = self.childAt(pt)
+                    # if not child or not isinstance(child, QPushButton):
+                    return True, 2 # HTCAPTION
+                
+                return True, 1 # HTCLIENT
+                
+        return super().nativeEvent(eventType, message)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -2232,8 +2220,9 @@ class SettingsWindow(QWidget):
         self.setGeometry(left, top, width, height)
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool)
         
-        # Resizer'ı başlat
-        self.resizer = FramelessResizer(self)
+        
+        # Resizer'ı başlat (Devre dışı bırakıldı - Native resize kullanılıyor)
+        # self.resizer = FramelessResizer(self)
         
         # Modern Stil
         self.setStyleSheet("""
@@ -2463,21 +2452,62 @@ class SettingsWindow(QWidget):
         self.load_settings()
 
     def mousePressEvent(self, event):
-        # Sadece sol tuş ile resize/drag
-        if event.button() == Qt.LeftButton:
-            self.resizer.handle_mouse_press(event)
-        else:
-            # Sağ tuş veya diğer butonlar için varsayılan davranış
-            super().mousePressEvent(event)
+        # Native resize kullanıldığı için buraya gerek kalmadı
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        self.resizer.handle_mouse_move(event)
+        # self.resizer.handle_mouse_move(event)
+        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         # Her zaman resizer'ı bilgilendir (flag temizleme için)
-        self.resizer.handle_mouse_release(event)
+        # self.resizer.handle_mouse_release(event)
         if event.button() != Qt.LeftButton:
             super().mouseReleaseEvent(event)
+
+    def nativeEvent(self, eventType, message):
+        """Windows Native Resize Handler (WM_NCHITTEST)"""
+        if eventType == "windows_generic_MSG":
+            # sip.voidptr -> int conversion
+            msg = ctypes.cast(int(message), ctypes.POINTER(MSG)).contents
+            
+            if msg.message == 0x0084: # WM_NCHITTEST
+                x = c_short(msg.lParam & 0xFFFF).value
+                y = c_short((msg.lParam >> 16) & 0xFFFF).value
+                
+                # Global koordinatları pencere koordinatlarına çevir
+                pt = self.mapFromGlobal(QPoint(x, y))
+                
+                w, h = self.width(), self.height()
+                lx = pt.x()
+                ly = pt.y()
+                
+                # Resize Kenar Boşluğu
+                border_width = 10
+                title_height = 40 # Üst kısımdan sürükleme alanı
+                
+                # Kenar Kontrolleri
+                left = lx < border_width
+                right = lx > w - border_width
+                top = ly < border_width
+                bottom = ly > h - border_width
+                
+                if top and left: return True, 13 # HTTOPLEFT
+                if top and right: return True, 14 # HTTOPRIGHT
+                if bottom and left: return True, 16 # HTBOTTOMLEFT
+                if bottom and right: return True, 17 # HTBOTTOMRIGHT
+                if left: return True, 10 # HTLEFT
+                if right: return True, 11 # HTRIGHT
+                if top: return True, 12 # HTTOP
+                if bottom: return True, 15 # HTBOTTOM
+                
+                # Başlık çubuğu davranışı (Sürükleme)
+                if ly < title_height:
+                    return True, 2 # HTCAPTION
+                
+                return True, 1 # HTCLIENT
+                
+        return super().nativeEvent(eventType, message)
 
     def closeEvent(self, event):
         """Pencere kapandığında boyut ve konumu kaydet."""

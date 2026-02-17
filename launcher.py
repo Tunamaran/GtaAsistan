@@ -9,11 +9,13 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QMessageBox, QProgressBar, QSpacerItem, QSizePolicy,
                              QCheckBox, QSystemTrayIcon, QMenu, QAction)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QFont, QIcon, QColor
+from PyQt5.QtGui import QFont, QIcon, QColor, QCursor
 import ctypes
-import ctypes
+from ctypes.wintypes import MSG
+from ctypes import c_long, c_int, c_short
 import time
-import logging  # ADDDED LOGGING
+import logging
+
 
 # Config modülünü yükle
 import config
@@ -155,76 +157,9 @@ class AutoPilotThread(QThread):
         self.wait()
 
 # ==========================================
-# FRAMELESS RESIZER (Çerçevesiz Pencereler İçin)
+# (Eski FramelessResizer Kaldırıldı)
 # ==========================================
-class FramelessResizer:
-    def __init__(self, window):
-        self.window = window
-        self.window.setMouseTracking(True)
-        self.margin = 10
-        self._is_resizing = False
-        self._is_dragging = False
-        self._drag_pos = None
-        self._resize_dir = None
 
-    def handle_mouse_press(self, event):
-        if event.button() == Qt.LeftButton:
-            pos = event.pos()
-            edge = self.get_edge(pos)
-            if edge:
-                self._is_resizing = True
-                self._resize_dir = edge
-            else:
-                self._is_dragging = True
-                self._drag_pos = event.globalPos() - self.window.frameGeometry().topLeft()
-            event.accept()
-
-    def handle_mouse_move(self, event):
-        pos = event.pos()
-        if self._is_resizing:
-            self.resize_window(event.globalPos())
-        elif self._is_dragging:
-            self.window.move(event.globalPos() - self._drag_pos)
-        else:
-            edge = self.get_edge(pos)
-            self.update_cursor(edge)
-
-    def handle_mouse_release(self, event):
-        self._is_resizing = False
-        self._is_dragging = False
-        self.window.unsetCursor()
-
-    def get_edge(self, pos):
-        w, h = self.window.width(), self.window.height()
-        x, y = pos.x(), pos.y()
-        m = self.margin
-        
-        edge = ""
-        if y < m: edge += "T"
-        elif y > h - m: edge += "B"
-        if x < m: edge += "L"
-        elif x > w - m: edge += "R"
-        return edge if edge else None
-
-    def update_cursor(self, edge):
-        if edge in ("TL", "BR"): self.window.setCursor(Qt.SizeFDiagCursor)
-        elif edge in ("TR", "BL"): self.window.setCursor(Qt.SizeBDiagCursor)
-        elif edge in ("T", "B"): self.window.setCursor(Qt.SizeVerCursor)
-        elif edge in ("L", "R"): self.window.setCursor(Qt.SizeHorCursor)
-        else: self.window.unsetCursor()
-
-    def resize_window(self, global_pos):
-        # QMainWindow için frameGeometry kullanmak daha sağlıklı olabilir
-        rect = self.window.geometry()
-        m_pos = global_pos
-        
-        if "L" in self._resize_dir: rect.setLeft(m_pos.x())
-        if "R" in self._resize_dir: rect.setRight(m_pos.x())
-        if "T" in self._resize_dir: rect.setTop(m_pos.y())
-        if "B" in self._resize_dir: rect.setBottom(m_pos.y())
-        
-        if rect.width() > 400 and rect.height() > 300:
-            self.window.setGeometry(rect)
 
 class LauncherWindow(QMainWindow):
     def __init__(self):
@@ -281,8 +216,9 @@ class LauncherWindow(QMainWindow):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.setStyleSheet(STYLESHEET)
         
-        # Resizer'ı başlat
-        self.resizer = FramelessResizer(self)
+        
+        # Resizer'ı başlat (Devre dışı - Native resize kullanılıyor)
+        # self.resizer = FramelessResizer(self)
         
         # Config yükle
         config.setup_logging() # LOGGING SETUP
@@ -346,40 +282,73 @@ class LauncherWindow(QMainWindow):
         }
         config.save_config(cfg)
 
-    def mousePressEvent(self, event):
-        # Sadece sol tuş ile resize/drag
-        if event.button() == Qt.LeftButton:
-            self.resizer.handle_mouse_press(event)
-        else:
-            # Sağ tuş veya diğer butonlar için varsayılan davranış
-            super().mousePressEvent(event)
+    
+    # Title bar drag metodları (Devre dışı - Native resize kullanılıyor)
+    # def _title_bar_press(self, event):
+    #     """Title bar'a tıklandığında pencereyi taşımaya başla"""
+    #     pass
+    
+    # def _title_bar_move(self, event):
+    #    pass
+    
+    # def _title_bar_release(self, event):
+    #    pass
 
-    def mouseMoveEvent(self, event):
-        self.resizer.handle_mouse_move(event)
+    def nativeEvent(self, eventType, message):
+        """Windows Native Resize Handler (WM_NCHITTEST)"""
+        if eventType == "windows_generic_MSG":
+            # sip.voidptr -> int conversion
+            msg = ctypes.cast(int(message), ctypes.POINTER(MSG)).contents
+            
+            if msg.message == 0x0084: # WM_NCHITTEST
+                x = c_short(msg.lParam & 0xFFFF).value
+                y = c_short((msg.lParam >> 16) & 0xFFFF).value
+                
+                # Global koordinatları pencere koordinatlarına çevir
+                pt = self.mapFromGlobal(self.mapToGlobal(self.mapFromGlobal(from_global_pt := ctypes.wintypes.POINT(x, y))) if False else self.mapFromGlobal(from_global_qpt := self.cursor().pos()))
+                # Basitçe QCursor.pos() yerine msg koordinatlarını kullanalım
+                # msg.lParam zaten global koordinatları veriyor
+                
+                # Qt'nin mapFromGlobal'i QPoint bekler
+                from PyQt5.QtCore import QPoint
+                pt = self.mapFromGlobal(QPoint(x, y))
+                
+                # ÖNCELİKLE BUTON KONTROLÜ (Resize'dan önce)
+                child = self.childAt(pt)
+                if child and isinstance(child, QPushButton):
+                     return True, 1 # HTCLIENT (Butona tıklamaya izin ver)
 
-    def mouseReleaseEvent(self, event):
-        # Her zaman resizer'ı bilgilendir (flag temizleme için)
-        self.resizer.handle_mouse_release(event)
-        if event.button() != Qt.LeftButton:
-            super().mouseReleaseEvent(event)
-    
-    # Title bar drag metodları
-    def _title_bar_press(self, event):
-        """Title bar'a tıklandığında pencereyi taşımaya başla"""
-        if event.button() == Qt.LeftButton:
-            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
-            event.accept()
-    
-    def _title_bar_move(self, event):
-        """Title bar sürüklenirken pencereyi taşı"""
-        if event.buttons() == Qt.LeftButton and self._drag_pos is not None:
-            self.move(event.globalPos() - self._drag_pos)
-            event.accept()
-    
-    def _title_bar_release(self, event):
-        """Title bar bırakıldığında drag'i bitir"""
-        self._drag_pos = None
-        event.accept()
+                w, h = self.width(), self.height()
+                lx = pt.x()
+                ly = pt.y()
+                
+                # Resize Kenar Boşluğu
+                border_width = 24
+                title_height = 35 # Custom Title Bar yüksekliği
+                
+                # Kenar Kontrolleri
+                left = lx < border_width
+                right = lx > w - border_width
+                top = ly < border_width
+                bottom = ly > h - border_width
+                
+                if top and left: return True, 13 # HTTOPLEFT
+                if top and right: return True, 14 # HTTOPRIGHT
+                if bottom and left: return True, 16 # HTBOTTOMLEFT
+                if bottom and right: return True, 17 # HTBOTTOMRIGHT
+                if left: return True, 10 # HTLEFT
+                if right: return True, 11 # HTRIGHT
+                if top: return True, 12 # HTTOP
+                if bottom: return True, 15 # HTBOTTOM
+                
+                # Başlık çubuğu davranışı (Sürükleme)
+                if ly < title_height:
+                    return True, 2 # HTCAPTION
+                
+                return True, 1 # HTCLIENT
+                
+        return super().nativeEvent(eventType, message)
+
 
     def init_ui(self):
         main_widget = QWidget()
@@ -424,7 +393,7 @@ class LauncherWindow(QMainWindow):
                 background-color: #3e3e42;
             }
         """)
-        self.min_btn.clicked.connect(self.showMinimized)
+        self.min_btn.clicked.connect(self.minimize_to_tray) # Direkt tepsiye küçült
         title_bar_layout.addWidget(self.min_btn)
         
         # Close butonu
@@ -443,19 +412,20 @@ class LauncherWindow(QMainWindow):
                 color: white;
             }
         """)
-        self.close_btn.clicked.connect(self.close)
+        self.close_btn.clicked.connect(self.quit_app) # Tam kapatma
         title_bar_layout.addWidget(self.close_btn)
         
         layout.addWidget(title_bar)
         
-        # Drag desteği için title bar event handling
-        self._drag_pos = None
-        title_bar.mousePressEvent = self._title_bar_press
-        title_bar.mouseMoveEvent = self._title_bar_move
-        title_bar.mouseReleaseEvent = self._title_bar_release
-        self.title_label.mousePressEvent = self._title_bar_press
-        self.title_label.mouseMoveEvent = self._title_bar_move
-        self.title_label.mouseReleaseEvent = self._title_bar_release
+        
+        # Drag desteği için title bar event handling (Native resize ile iptal)
+        # self._drag_pos = None
+        # title_bar.mousePressEvent = self._title_bar_press
+        # title_bar.mouseMoveEvent = self._title_bar_move
+        # title_bar.mouseReleaseEvent = self._title_bar_release
+        # self.title_label.mousePressEvent = self._title_bar_press
+        # self.title_label.mouseMoveEvent = self._title_bar_move
+        # self.title_label.mouseReleaseEvent = self._title_bar_release
         
         # === ANA İÇERİK ===
         content_widget = QWidget()
@@ -674,18 +644,28 @@ class LauncherWindow(QMainWindow):
         else:
             self.quit_app()
 
+    def minimize_to_tray(self):
+        """Pencereyi gizle ve tepsiye küçüldü bilgisini ver."""
+        self.hide()
+        self.tray_icon.showMessage(
+            "Sistem Tepsisine Küçültüldü", 
+            "Uygulama arka planda çalışıyor.",
+            QSystemTrayIcon.Information, 
+            1000
+        )
+
     def changeEvent(self, event):
-        if event.type() == 105: # QEvent.WindowStateChange
-            if self.windowState() & Qt.WindowMinimized:
-                # Küçültme butonuna basıldı -> Tepsiye gönder
-                event.ignore()
-                self.hide()
-                self.tray_icon.showMessage(
-                    "Sistem Tepsisine Küçültüldü", 
-                    "Uygulama arka planda çalışıyor.",
-                    QSystemTrayIcon.Information, 
-                    1000
-                )
+        # if event.type() == 105: # QEvent.WindowStateChange
+        #     if self.windowState() & Qt.WindowMinimized:
+        #         # Küçültme butonuna basıldı -> Tepsiye gönder
+        #         event.ignore()
+        #         self.hide()
+        #         self.tray_icon.showMessage(
+        #             "Sistem Tepsisine Küçültüldü", 
+        #             "Uygulama arka planda çalışıyor.",
+        #             QSystemTrayIcon.Information, 
+        #             1000
+        #         )
         super().changeEvent(event)
 
     def toggle_autopilot(self, checked):
