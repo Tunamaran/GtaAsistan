@@ -10,6 +10,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('app_icon.ico', '.'),
+        ('locales', 'locales'),
     ],
     hiddenimports=[
         'config', 'database', 'history', 'ui', 'workers',

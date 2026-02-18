@@ -9,7 +9,7 @@ from typing import Dict, Any
 import logging
 
 
-VERSION = "18022026.09"
+VERSION = "18022026.14"
 
 def setup_logging():
     """Loglama yapılandırmasını başlatır."""

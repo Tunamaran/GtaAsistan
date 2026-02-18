@@ -11,6 +11,7 @@ a = Analysis(
     datas=[
         ('gta_tum_araclar.json', '.'),
         ('app_icon.ico', '.'),
+        ('locales', 'locales'),
     ],
     hiddenimports=[
         'config', 'database', 'history', 'ui', 'workers', 'main',

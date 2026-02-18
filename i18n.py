@@ -18,6 +18,10 @@ def load_translations():
     # Hedef dil dosyasını yükle
     target_file = os.path.join(APP_DIR, "locales", f"{_current_lang}.json")
     if not os.path.exists(target_file):
+        # PyInstaller _internal check
+        target_file = os.path.join(APP_DIR, "_internal", "locales", f"{_current_lang}.json")
+        
+    if not os.path.exists(target_file):
         # Eğer APP_DIR içinde yoksa (dev ortamı), belki scriptin yanındadır
         target_file = os.path.join(os.path.dirname(__file__), "locales", f"{_current_lang}.json")
 
@@ -35,6 +39,9 @@ def load_translations():
     # Fallback (Türkçe) yükle (Eğer hedef dil TR değilse)
     if _current_lang != "tr":
         fallback_file = os.path.join(APP_DIR, "locales", "tr.json")
+        if not os.path.exists(fallback_file):
+            fallback_file = os.path.join(APP_DIR, "_internal", "locales", "tr.json")
+            
         if not os.path.exists(fallback_file):
              fallback_file = os.path.join(os.path.dirname(__file__), "locales", "tr.json")
              

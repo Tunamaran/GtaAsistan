@@ -3,7 +3,7 @@ import os
 import subprocess
 import json
 import argparse  # Added for argument parsing
-from config import APP_DIR
+from config import APP_DIR, save_config
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QTabWidget, 
                              QTextEdit, QLineEdit, QFormLayout, QGroupBox, 
@@ -1069,7 +1069,7 @@ class LauncherWindow(QMainWindow):
         if getattr(sys, 'frozen', False):
             target_exe = os.path.join(APP_DIR, "launcher.exe")
             # Exe için tırnak içine al (boşluk varsa)
-            command = f'\\"{target_exe}\\"' 
+            command = f'"{target_exe}"' 
         else:
             # Geliştirme ortamı için
             python_exe = sys.executable
@@ -1078,7 +1078,7 @@ class LauncherWindow(QMainWindow):
             if not os.path.exists(pythonw): pythonw = python_exe
             
             launcher_script = os.path.join(APP_DIR, "launcher.py")
-            command = f'\\"{pythonw}\\" \\"{launcher_script}\\"'
+            command = f'"{pythonw}" "{launcher_script}"'
 
         if checked:
             try:
