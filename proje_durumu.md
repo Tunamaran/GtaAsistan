@@ -142,7 +142,9 @@
 - [x] **[FIX]** AssertionError exception handling (winocr başlatma hatası)
 - [x] **[FIX]** Launcher'da subprocess exit code kontrolü (300ms crash detection)
 - [x] **[UX]** OCR hatası GUI popup ile bildirim (çözüm adımları dahil)
-- [x] **[UX]** Detaylı hata mesajları (dil paketi eksik, Tesseract yok, vs.)
+- [x] **[HATA]** Detaylı hata mesajları (dil paketi eksik, Tesseract yok, vs.)
+- [x] **[FIX]** **HUD Kilitlenme Sorunu Giderildi:** F9 ile araç kaydederken yaşanan deadlock (RLock düzeltmesi) giderildi. 🛡️✨
+
 
 ### 🚀 Tam Otomatik Kurulum Sistemi (Commit: c77d952)
 - [x] **[NEW]** Tesseract OCR gömülü installer (~60MB, portable)

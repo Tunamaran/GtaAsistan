@@ -14,7 +14,7 @@ GARAGE_FILE = os.path.join(DATA_DIR, "garajim.json")
 # Basit dosya cache (Tekrar tekrar disk okumasını önler)
 _garage_cache: Optional[List[str]] = None
 _garage_mtime: float = 0
-_garage_lock = threading.Lock()  # Thread-safe erişim için
+_garage_lock = threading.RLock()  # Thread-safe erişim için (Reentrant)
 
 def load_garage() -> List[str]:
     """Kayıtlı araç listesini yükler (cache destekli, thread-safe)."""
