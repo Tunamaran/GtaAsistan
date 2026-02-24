@@ -331,6 +331,14 @@ class OcrThread(QThread):
         try:
             import ctypes
             hwnd = ctypes.windll.user32.GetForegroundWindow()
+            
+            # 1. Yöntem: Sınıf adı (grcWindow) ile kesin kontrol
+            class_name = ctypes.create_unicode_buffer(256)
+            ctypes.windll.user32.GetClassNameW(hwnd, class_name, 256)
+            if class_name.value == "grcWindow":
+                return True
+                
+            # 2. Yöntem: Pencere başlığı (Title) ile yedek kontrol
             length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
             if length == 0:
                 return False

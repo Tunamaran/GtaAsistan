@@ -141,16 +141,37 @@ class AutoPilotThread(QThread):
         self.running = True
         self.game_running = False
 
+    def _is_gta_running(self):
+        # 1. Yöntem: Pencere Sınıfı (GTA V = grcWindow)
+        hwnd = ctypes.windll.user32.FindWindowW("grcWindow", None)
+        if hwnd != 0:
+            return True
+            
+        # 2. Yöntem: İşlem Adı (GTA5.exe) - Arka planda olsa bie garanti
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0 # SW_HIDE
+            output = subprocess.check_output(
+                'tasklist /FI "IMAGENAME eq GTA5.exe" /NH',
+                shell=True, text=True, startupinfo=startupinfo
+            )
+            if "GTA5.exe" in output:
+                return True
+        except Exception as e:
+            logging.debug(f"[AutoPilot] Tasklist hatası: {e}")
+            
+        return False
+
     def run(self):
         while self.running:
-            # GTA 5 Pencere Kontrolü (Windows API)
-            hwnd = ctypes.windll.user32.FindWindowW(None, "Grand Theft Auto V")
+            is_running = self._is_gta_running()
             
-            if hwnd != 0 and not self.game_running:
+            if is_running and not self.game_running:
                 # Oyun yeni açıldı
                 self.game_running = True
                 self.game_started.emit()
-            elif hwnd == 0 and self.game_running:
+            elif not is_running and self.game_running:
                 # Oyun kapandı
                 self.game_running = False
                 self.game_stopped.emit()
