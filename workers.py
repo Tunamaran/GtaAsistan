@@ -432,9 +432,15 @@ class OcrThread(QThread):
                                     x2 = min(gray_2x.shape[1], x + w)
                                     
                                     if x2 > x1 and y2 > y1:
-                                        roi = gray_2x[y1:y2, x1:x2]
-                                        brightness = float(np.mean(roi))
-                                        candidates.append((match, score, brightness, clean))
+                                        # HEURISTIC: Oyun içi çevre metinlerini engelleme
+                                        # Menüler sola hizalıdır. x_start (2x resimde) çok sağdaysa reddet. (Max 450px)
+                                        # Yükseklik çok büyükse (dev tabela vb) reddet. (Max 120px)
+                                        if x < 450 and h < 120:
+                                            roi = gray_2x[y1:y2, x1:x2]
+                                            brightness = float(np.mean(roi))
+                                            candidates.append((match, score, brightness, clean))
+                                        else:
+                                            logging.debug(f"[DEBUG] Çevre Yazısı Reddedildi: '{clean}' (X={x}, H={h})")
                         
                         # 6. En parlak (highlight olan) adayı seç
                         # YENİ: Sadece parlak (seçili) öğeleri dikkate al (Başlıkları ve seçili olmayanları eler)
@@ -519,6 +525,11 @@ class OcrThread(QThread):
                             max_h = self.MAX_CONTOUR_HEIGHT * self.scale_factor
                             
                             if not (min_w < w < max_w and min_h < h < max_h):
+                                        continue
+                                        
+                            # HEURISTIC: Oyun içi çevre yazıları sol sınırdan uzaktır
+                            max_x_allowed = 225 * self.scale_factor
+                            if x > max_x_allowed:
                                 continue
                             
                             crop_w = w - 10 if w > 50 else w
