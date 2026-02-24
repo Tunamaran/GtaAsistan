@@ -11,26 +11,35 @@ import logging
 
 VERSION = "18022026.15"
 
-def setup_logging():
-    """Loglama yapılandırmasını başlatır."""
-    # Program Files gibi korumalı dizinlere yazmaya çalışırsak hata alırız.
-    # Bu yüzden logları LocalAppData klasörüne kaydediyoruz.
-    # Bu yüzden logları LocalAppData klasörüne kaydediyoruz.
+def setup_logging() -> None:
+    """Loglama yapılandırmasını başlatır (konsol + dosya)."""
     log_dir = os.path.join(os.getenv('LOCALAPPDATA'), "GtaAsistan")
     os.makedirs(log_dir, exist_ok=True)
-    
+
     global LOG_FILE
-    LOG_FILE = os.path.join(log_dir, "debug.log")
-    
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(LOG_FILE, encoding='utf-8', mode='w'),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    # 3. Parti kütüphanelerin loglarını sustur
+    LOG_FILE = os.path.join(log_dir, "app.log")
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+
+    # Tekrar çağrılmalarda duplicate handler oluşmasını engelle
+    if root_logger.handlers:
+        root_logger.handlers.clear()
+
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    file_handler = logging.FileHandler(LOG_FILE, encoding='utf-8', mode='a')
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(formatter)
+
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(stream_handler)
+
+    # 3. parti kütüphanelerin detaylı loglarını azalt
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("PIL").setLevel(logging.WARNING)
     logging.getLogger("mss").setLevel(logging.WARNING)
@@ -38,7 +47,8 @@ def setup_logging():
     logging.info("==========================================")
     logging.info(f"GTA Asistan Başlatılıyor... (v{VERSION})")
     logging.info(f"App Dir: {APP_DIR}")
-    logging.info(f"Log Dir: {log_dir}")
+    logging.info(f"Data Dir: {DATA_DIR}")
+    logging.info(f"Log File: {LOG_FILE}")
     logging.info("==========================================")
 
 def get_app_dir() -> str:
@@ -64,13 +74,20 @@ BASELINE_RESOLUTION = (2560, 1600)
 
 
 def _get_default_tesseract_path() -> str:
-    """Tesseract varsayılan yolunu döndürür (frozen mod desteği)."""
+    """Tesseract için dinamik varsayılan yolları dener."""
+    bundled_tesseract = os.path.join(APP_DIR, "tesseract", "tesseract.exe")
+    system_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+    # Frozen modda önce uygulama içindeki portable sürüm tercih edilir
     if getattr(sys, 'frozen', False):
-        # Frozen mod (exe): Uygulama dizinindeki tesseract
-        return os.path.join(APP_DIR, "tesseract", "tesseract.exe")
-    else:
-        # Normal mod: Sistem yolu
-        return r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if os.path.exists(bundled_tesseract):
+            return bundled_tesseract
+        return system_tesseract
+
+    # Geliştirme modunda proje içi portable varsa onu da kullanabilsin
+    if os.path.exists(bundled_tesseract):
+        return bundled_tesseract
+    return system_tesseract
 
 BASELINE_CONFIG: Dict[str, Any] = {
     "tesseract_path": _get_default_tesseract_path(),

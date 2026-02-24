@@ -2,6 +2,7 @@
 """Arka plan işçi thread'leri: OCR, kısayol ve resim yükleme."""
 import time
 import re
+import os
 import asyncio
 import logging
 from typing import Dict, List, Optional, Tuple
@@ -15,7 +16,7 @@ from thefuzz import process, fuzz
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage
 import i18n
-from config import load_config
+from config import load_config, _get_default_tesseract_path
 
 # Config yükle
 cfg = load_config()
@@ -59,13 +60,11 @@ def get_ocr_engine():
             global pytesseract
             import pytesseract
             # Dinamik yol kontrolü
-            from config import _get_default_tesseract_path
             _tess_path = cfg.get("tesseract_path", _get_default_tesseract_path())
-            
+
             if not os.path.exists(_tess_path):
                 logging.error(f"{i18n.t('workers.tesseract_not_found')}: {_tess_path}")
-                # Fallback to system path if bundled fails
-                _tess_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+                _tess_path = _get_default_tesseract_path()
                 
             pytesseract.pytesseract.tesseract_cmd = _tess_path
             OCR_ENGINE = "tesseract"
@@ -128,8 +127,8 @@ class ImageLoaderThread(QThread):
                     img.loadFromData(resp.content)
                     if not img.isNull():
                         self.image_loaded_signal.emit(self.url, img)  # QImage gönder
-        except Exception as e:
-            print(f"[UYARI] Resim yükleme hatası: {e}")
+        except Exception:
+            logging.exception("[ImageLoaderThread] Resim yükleme hatası")
 
 
 class OcrThread(QThread):
@@ -300,18 +299,32 @@ class OcrThread(QThread):
     # Ana döngü
     # =====================================================
     def run(self) -> None:
-        """Ana OCR döngüsü — motor tipine göre farklı yol izler."""
-        # Config'i tazele (Launcher'da değişmiş olabilir)
+        """Ana OCR döngüsü — hata alsa da kontrollü şekilde tekrar başlatır."""
         global cfg
-        cfg = load_config()
-        
-        engine = get_ocr_engine()
-        if engine == "winocr":
-            self._run_winocr_loop()
-        elif engine == "tesseract":
-            self._run_tesseract_loop()
-        else:
-            logging.error("OCR Motoru başlatılamadığı için thread duruyor.")
+        restart_attempt = 0
+
+        while self.running:
+            try:
+                cfg = load_config()  # Launcher'da değişmiş olabilir
+                engine = get_ocr_engine()
+
+                if engine == "winocr":
+                    self._run_winocr_loop()
+                elif engine == "tesseract":
+                    self._run_tesseract_loop()
+                else:
+                    logging.error("OCR Motoru başlatılamadığı için thread beklemeye alındı.")
+                    time.sleep(2.0)
+
+                restart_attempt = 0
+                break
+
+            except Exception:
+                restart_attempt += 1
+                backoff = min(10, 2 ** min(restart_attempt, 5))
+                logging.exception(f"[OcrThread] Kritik hata. {backoff}s sonra yeniden denenecek.")
+                self.hide_hud_signal.emit()
+                time.sleep(backoff)
 
     def _is_gta_active(self) -> bool:
         """Aktif pencerenin GTA 5 olup olmadığını kontrol eder."""
@@ -444,13 +457,13 @@ class OcrThread(QThread):
                             self.hide_hud_signal.emit()
                             last_matched = ""
                     
-                    except Exception as e:
-                        print(f"[HATA] OCR Döngüsü Hatası: {e}")
+                    except Exception:
+                        logging.exception("[OcrThread:winocr] OCR döngüsü hatası")
                         self.hide_hud_signal.emit()
                         last_matched = ""
-                        time.sleep(1)
-                    
-                    time.sleep(0.2)  # Seri tepki için düşük gecikme
+                        time.sleep(1.0)
+
+                    time.sleep(0.25)
             finally:
                 if self._loop:
                     self._loop.close()
@@ -527,13 +540,13 @@ class OcrThread(QThread):
                             self.hide_hud_signal.emit() 
                             last_matched = ""
                     
-                    except Exception as e:
-                        print(f"[HATA] OCR Döngüsü Hatası: {e}")
+                    except Exception:
+                        logging.exception("[OcrThread:tesseract] OCR döngüsü hatası")
                         self.hide_hud_signal.emit()
                         last_matched = ""
-                        time.sleep(1)
-                    
-                    time.sleep(0.5)
+                        time.sleep(1.0)
+
+                    time.sleep(0.35)
             finally:
                 # Cleanup
                 self.hide_hud_signal.emit()

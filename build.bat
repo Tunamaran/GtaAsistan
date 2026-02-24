@@ -112,7 +112,17 @@ set ISCC_PATH=C:\Users\%USERNAME%\AppData\Local\Programs\Inno Setup 6\iscc.exe
 if exist "%ISCC_PATH%" (
     echo [BONUS] Installer olusturuluyor...
     "%ISCC_PATH%" installer.iss
-    echo   Installer: Output\GtaAsistan_Setup_v1.0.0.exe
+    if errorlevel 1 (
+        echo HATA: Installer olusturma basarisiz!
+        pause
+        exit /b 1
+    )
+    for /f "tokens=2 delims==" %%v in ('findstr /b /c:"OutputBaseFilename=" installer.iss') do set OUTPUT_BASE=%%v
+    if defined OUTPUT_BASE (
+        echo   Installer: Output\%OUTPUT_BASE%.exe
+    ) else (
+        echo   Installer olustu. Dosya adi installer.iss icindeki OutputBaseFilename degerine gore belirlenir.
+    )
 ) else (
     echo [BILGI] Inno Setup bulunamadi.
     echo   Installer icin Inno Setup yukleyin:
