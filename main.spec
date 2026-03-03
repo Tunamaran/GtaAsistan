@@ -15,7 +15,7 @@ a = Analysis(
     hiddenimports=[
         'config', 'database', 'history', 'ui', 'workers',
         'PyQt5', 'PyQt5.QtWidgets', 'PyQt5.QtCore', 'PyQt5.QtGui',
-        'winocr', 'pytesseract',
+        'winocr', 'pytesseract', 'requests',
         'winrt', 'winrt.windows.media.ocr',
         'winrt.windows.graphics.imaging',
         'winrt.windows.storage.streams',

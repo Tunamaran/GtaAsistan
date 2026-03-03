@@ -15,7 +15,7 @@ a = Analysis(
     ],
     hiddenimports=[
         'config', 'database', 'history', 'ui', 'workers', 'main',
-        'VeriÇek',
+        'VeriÇek', 'requests',
         'PyQt5', 'PyQt5.QtWidgets', 'PyQt5.QtCore', 'PyQt5.QtGui',
         'cloudscraper', 'bs4', 'lxml',
         # OCR ve Ekran Yakalama
