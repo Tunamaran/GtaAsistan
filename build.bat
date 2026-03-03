@@ -31,11 +31,12 @@ echo [1/7] Eski build dosyalari temizleniyor...
 if exist "dist" rmdir /s /q dist
 if exist "build" rmdir /s /q build
 
-REM Icon olustur (yoksa)
+REM Icon kontrol
 echo [2/7] Uygulama ikonu kontrol ediliyor...
 if not exist "app_icon.ico" (
-    echo   Icon bulunamadi, olusturuluyor...
-    python create_icon.py
+    echo   UYARI: app_icon.ico bulunamadi! Lutfen proje dizinine ekleyin.
+    pause
+    exit /b 1
 )
 
 REM Tesseract portable kontrol
@@ -108,9 +109,9 @@ echo   Build Tamamlandi!
 echo   Cikti: dist\GtaAsistan\
 echo ========================================
 echo.
-echo   launcher.exe - Ana program (%.1f MB)
-echo   main.exe     - Asistan motoru (%.1f MB)
-echo   tesseract\   - OCR motoru (~60 MB)
+echo   launcher.exe - Ana program
+echo   main.exe     - Asistan motoru
+echo   tesseract\   - OCR motoru
 echo.
 
 REM Inno Setup ile installer olustur (varsa)
