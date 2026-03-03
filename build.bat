@@ -4,6 +4,12 @@ REM  GTA Asistan - Build Script
 REM  Bu dosya PyInstaller ile exe oluşturur
 REM ============================================
 
+REM Sanal Ortamı Aktive Et
+if exist ".\.venv\Scripts\activate.bat" (
+    echo [BILGI] Sanal ortam aktif ediliyor...
+    call ".\.venv\Scripts\activate.bat"
+)
+
 echo.
 echo ========================================
 echo   GTA Asistan - Build Baslatiliyor

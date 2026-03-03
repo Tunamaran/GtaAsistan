@@ -147,16 +147,18 @@ class AutoPilotThread(QThread):
         if hwnd != 0:
             return True
             
-        # 2. Yöntem: İşlem Adı (GTA5.exe) - Arka planda olsa bie garanti
+        # 2. Yöntem: İşlem Adı (GTA5.exe, GTA5_Enhanced.exe vs.) - Arka planda olsa bie garanti
         try:
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = 0 # SW_HIDE
             output = subprocess.check_output(
-                'tasklist /FI "IMAGENAME eq GTA5.exe" /NH',
+                'tasklist /NH',
                 shell=True, text=True, startupinfo=startupinfo
             )
-            if "GTA5.exe" in output:
+            gta_exes = ["gta5.exe", "gta5_enhanced.exe", "gta5_enhanced_be.exe"]
+            lower_out = output.lower()
+            if any(exe in lower_out for exe in gta_exes):
                 return True
         except Exception as e:
             logging.debug(f"[AutoPilot] Tasklist hatası: {e}")
@@ -521,11 +523,6 @@ class LauncherWindow(QMainWindow):
         title_bar_layout.addStretch()
         
         # Minimize butonu
-        self.min_lbl = QLabel(i18n.t("launcher.minimize_to_tray_label"))
-        self.min_lbl.setFont(QFont("Segoe UI", 9))
-        self.min_lbl.setStyleSheet("color: #888888; margin-right: 5px;")
-        title_bar_layout.addWidget(self.min_lbl)
-        
         self.minimize_to_tray_btn = QPushButton(i18n.t("launcher.minimize_label"))
         self.minimize_to_tray_btn.setFixedSize(140, 30)
         self.minimize_to_tray_btn.setCursor(Qt.PointingHandCursor)
@@ -852,21 +849,6 @@ class LauncherWindow(QMainWindow):
         layout.setSpacing(12)
         layout.setContentsMargins(10, 10, 10, 10)
         
-        # --- OCR Region ---
-        layout.addRow(QLabel(i18n.t("launcher.ocr_region_title")))
-        ocr = self.cfg.get("ocr_region", {})
-        self.input_top = QLineEdit(str(ocr.get("top", 0)))
-        self.input_left = QLineEdit(str(ocr.get("left", 0)))
-        self.input_width = QLineEdit(str(ocr.get("width", 500)))
-        self.input_height = QLineEdit(str(ocr.get("height", 800)))
-        
-        layout.addRow(i18n.t("launcher.ocr_top_label"), self.input_top)
-        layout.addRow(i18n.t("launcher.ocr_left_label"), self.input_left)
-        layout.addRow(i18n.t("launcher.ocr_width_label"), self.input_width)
-        layout.addRow(i18n.t("launcher.ocr_height_label"), self.input_height)
-        
-        layout.addRow(QLabel("")) # Spacer
-
         # --- HUD Region ---
         layout.addRow(QLabel(i18n.t("launcher.hud_region_title")))
         hud = self.cfg.get("hud_region", {})
@@ -1265,7 +1247,6 @@ class LauncherWindow(QMainWindow):
         """Ayarları kaydet - hatalı alanları vurgula"""
         # Önce tüm alanların stilini sıfırla
         input_fields = [
-            self.input_top, self.input_left, self.input_width, self.input_height,
             self.input_hud_top, self.input_hud_left, self.input_hud_width, self.input_hud_height
         ]
         for field in input_fields:
@@ -1275,35 +1256,6 @@ class LauncherWindow(QMainWindow):
         error_msg = ""
         
         try:
-            # OCR Region validation
-            try:
-                self.cfg["ocr_region"]["top"] = int(self.input_top.text())
-            except ValueError:
-                error_field = self.input_top
-                error_msg = i18n.t("launcher.error_ocr_top_invalid")
-                raise
-            
-            try:
-                self.cfg["ocr_region"]["left"] = int(self.input_left.text())
-            except ValueError:
-                error_field = self.input_left
-                error_msg = i18n.t("launcher.error_ocr_left_invalid")
-                raise
-            
-            try:
-                self.cfg["ocr_region"]["width"] = int(self.input_width.text())
-            except ValueError:
-                error_field = self.input_width
-                error_msg = i18n.t("launcher.error_ocr_width_invalid")
-                raise
-            
-            try:
-                self.cfg["ocr_region"]["height"] = int(self.input_height.text())
-            except ValueError:
-                error_field = self.input_height
-                error_msg = i18n.t("launcher.error_ocr_height_invalid")
-                raise
-            
             # HUD Region Key Check (Eski configlerde olmayabilir)
             if "hud_region" not in self.cfg: 
                 self.cfg["hud_region"] = {}
@@ -1341,7 +1293,6 @@ class LauncherWindow(QMainWindow):
             
             # Değişiklik kontrolü için eski değerleri sakla
             old_hotkeys = self.cfg["hotkeys"].copy()
-            old_ocr = self.cfg["ocr_region"].copy()
             old_hud = self.cfg["hud_region"].copy()
             old_tess = self.cfg.get("tesseract_path", "")
             
@@ -1364,24 +1315,6 @@ class LauncherWindow(QMainWindow):
             if old_hotkeys.get("toggle_gallery") != new_hk_gallery or \
                old_hotkeys.get("toggle_ownership") != new_hk_own:
                 restart_needed = True
-                
-            # OCR Region değişti mi? (Zaten yukarıda self.cfg güncellendiği için 
-            # yukarıdaki try-except bloklarında self.cfg değil geçici değişken kullanmalıydık
-            # ama kod yapısı gereği direkt self.cfg güncelliyoruz. 
-            # Bu yüzden "old_ocr" deep copy olmalıydı (yukarıda copy() kullandık, dict için shallow copy yeterli olabilir ama nested değil)
-            # Düzeltme: ocr_region bir dict olduğu için direkt karşılaştırma çalışır.
-            # Ancak yukarıda self.cfg["ocr_region"]["top"] = ... atamaları yapıldı.
-            # Bu yüzden old_ocr'ı EN BAŞTA almalıydık.
-            # Refactor: save_settings başında snapshot alacağız.
-            
-            # Refactor için save_settings'in başına gidip snapshot alalım.
-            # Ancak bu tool çağrısında sadece bu bloğu değiştiriyoruz.
-            # Bu yüzden "restart_needed" mantığını basitleştirelim:
-            # Kritik ayarlar kaydedildi, kullanıcıya soralım.
-            
-            # Daha sağlam bir yöntem: Config her zaman kaydedilsin.
-            # Kullanıcıya "Değişikliklerin aktif olması için yeniden başlatmak ister misiniz?" diye soralım.
-            # Özellikle Hotkey ve Region değişiklikleri runtime'da worker'a yansımaz (worker thread restart gerekebilir).
             
             reply = QMessageBox.question(self, i18n.t("launcher.restart_confirm_title"), 
                                          i18n.t("launcher.restart_confirm_msg"),
@@ -1438,16 +1371,9 @@ class LauncherWindow(QMainWindow):
             defaults = config.get_scaled_default_config()
             
             # Sadece bölge ayarlarını güncelle
-            self.cfg["ocr_region"] = defaults["ocr_region"]
             self.cfg["hud_region"] = defaults["hud_region"]
             
             # UI Güncelle
-            ocr = self.cfg["ocr_region"]
-            self.input_top.setText(str(ocr.get("top")))
-            self.input_left.setText(str(ocr.get("left")))
-            self.input_width.setText(str(ocr.get("width")))
-            self.input_height.setText(str(ocr.get("height")))
-            
             hud = self.cfg["hud_region"]
             self.input_hud_top.setText(str(hud.get("top")))
             self.input_hud_left.setText(str(hud.get("left")))
@@ -1468,12 +1394,6 @@ class LauncherWindow(QMainWindow):
             self.cfg = config.load_config()
             
             # UI'ı güncelle
-            ocr = self.cfg.get("ocr_region", {})
-            self.input_top.setText(str(ocr.get("top", 0)))
-            self.input_left.setText(str(ocr.get("left", 0)))
-            self.input_width.setText(str(ocr.get("width", 678)))
-            self.input_height.setText(str(ocr.get("height", 635)))
-            
             hk = self.cfg.get("hotkeys", {})
             self.input_hk_gallery.setText(hk.get("toggle_gallery", "f11"))
             self.input_hk_own.setText(hk.get("toggle_ownership", "f9"))

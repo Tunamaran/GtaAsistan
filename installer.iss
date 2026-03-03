@@ -1,13 +1,13 @@
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
 AppName=GTA Asistan
-AppVersion=03032026.04
+AppVersion=04032026.03
 AppPublisher=GTA Asistan
 DefaultDirName={autopf}\GTA Asistan
 DefaultGroupName=GTA Asistan
 DisableProgramGroupPage=yes
 OutputDir=Output
-OutputBaseFilename=GtaAsistan_Setup_v03032026.04
+OutputBaseFilename=GtaAsistan_Setup_v04032026.03
 SetupIconFile=app_icon.ico
 UninstallDisplayIcon={app}\launcher.exe
 Compression=lzma2/ultra64

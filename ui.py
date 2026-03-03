@@ -2386,34 +2386,6 @@ class SettingsWindow(QWidget):
         general_group.setLayout(general_layout)
         content_layout.addWidget(general_group)
         
-        # --- OCR AYARLARI (QGroupBox) ---
-        ocr_group = QGroupBox(i18n.t("settings.ocr_region_group"))
-        ocr_layout = QFormLayout() 
-        ocr_layout.setSpacing(10)
-        
-        # Bölge Seç Butonu
-        self.snip_btn = QPushButton(i18n.t("settings.select_ocr_area"))
-        self.snip_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.snip_btn.setStyleSheet("background: #e17055; color: white;")
-        self.snip_btn.clicked.connect(self.start_snip)
-        ocr_layout.addRow(self.snip_btn)
-        
-        # Koordinatlar
-        self.ocr_left = QSpinBox(); self.ocr_left.setRange(0, 5000)
-        ocr_layout.addRow(i18n.t("settings.left_x"), self.ocr_left)
-        
-        self.ocr_top = QSpinBox(); self.ocr_top.setRange(0, 5000)
-        ocr_layout.addRow(i18n.t("settings.top_y"), self.ocr_top)
-        
-        self.ocr_width = QSpinBox(); self.ocr_width.setRange(50, 5000)
-        ocr_layout.addRow(i18n.t("settings.width"), self.ocr_width)
-        
-        self.ocr_height = QSpinBox(); self.ocr_height.setRange(10, 2000)
-        ocr_layout.addRow(i18n.t("settings.height"), self.ocr_height)
-        
-        ocr_group.setLayout(ocr_layout)
-        content_layout.addWidget(ocr_group)
-
         # --- HUD AYARLARI (QGroupBox) ---
         hud_group = QGroupBox(i18n.t("settings.hud_window_group"))
         hud_layout = QFormLayout()
@@ -2563,12 +2535,6 @@ class SettingsWindow(QWidget):
         self.hk_gallery.setText(hotkeys.get("toggle_gallery", "f11"))
         self.hk_ownership.setText(hotkeys.get("toggle_ownership", "f9"))
         self.hk_ocr.setText(hotkeys.get("toggle_ocr", "f10"))
-        
-        ocr = cfg.get("ocr_region", {})
-        self.ocr_top.setValue(ocr.get("top", 0))
-        self.ocr_left.setValue(ocr.get("left", 0))
-        self.ocr_width.setValue(ocr.get("width", 500))
-        self.ocr_height.setValue(ocr.get("height", 800))
 
         hud = cfg.get("hud_region", {})
         self.hud_top.setValue(hud.get("top", 40))
@@ -2580,18 +2546,12 @@ class SettingsWindow(QWidget):
         cfg = load_config()
         
         # Değişiklik kontrolü için eski değerler
-        old_ocr = cfg.get("ocr_region", {}).copy()
         old_hud = cfg.get("hud_region", {}).copy()
         old_hotkeys = cfg.get("hotkeys", {}).copy()
 
         cfg["hotkeys"]["toggle_gallery"] = self.hk_gallery.text()
         cfg["hotkeys"]["toggle_ownership"] = self.hk_ownership.text()
         cfg["hotkeys"]["toggle_ocr"] = self.hk_ocr.text()
-        
-        cfg["ocr_region"]["top"] = self.ocr_top.value()
-        cfg["ocr_region"]["left"] = self.ocr_left.value()
-        cfg["ocr_region"]["width"] = self.ocr_width.value()
-        cfg["ocr_region"]["height"] = self.ocr_height.value()
 
         if "hud_region" not in cfg: cfg["hud_region"] = {}
         cfg["hud_region"]["top"] = self.hud_top.value()
@@ -2605,8 +2565,7 @@ class SettingsWindow(QWidget):
         restart_needed = False
         
         # Basit karşılaştırma (Dict eşitliği yeterli)
-        if old_ocr != cfg["ocr_region"] or \
-           old_hud != cfg["hud_region"] or \
+        if old_hud != cfg["hud_region"] or \
            old_hotkeys != cfg["hotkeys"]:
             restart_needed = True
             
@@ -2654,27 +2613,6 @@ class SettingsWindow(QWidget):
             
         QApplication.quit()
 
-
-    def start_snip(self):
-        self.hide()
-        x = self.ocr_left.value()
-        y = self.ocr_top.value()
-        w = self.ocr_width.value()
-        h = self.ocr_height.value()
-        
-        initial_rect = (x, y, w, h) if w > 0 and h > 0 else None
-        
-        self.snipper = InteractiveSnipper(initial_rect)
-        self.snipper.on_snip_callback = self.on_snip_finished
-        self.snipper.on_close_callback = self.show
-        self.snipper.show()
-
-    def on_snip_finished(self, x, y, w, h):
-        self.ocr_left.setValue(x)
-        self.ocr_top.setValue(y)
-        self.ocr_width.setValue(w)
-        self.ocr_height.setValue(h)
-        self.show()
 
     def start_hud_snip(self):
         self.hide()

@@ -9,7 +9,7 @@ from typing import Dict, Any
 import logging
 
 
-VERSION = "03032026.04"
+VERSION = "04032026.03"
 
 def setup_logging() -> None:
     """Loglama yapılandırmasını başlatır (konsol + dosya)."""
@@ -96,12 +96,6 @@ BASELINE_CONFIG: Dict[str, Any] = {
         "toggle_ownership": "f9",
         "toggle_ocr": "f10"
     },
-    "ocr_region": {
-        "top": 0,
-        "left": 0,
-        "width": 678,  # 2560 px genişlikte
-        "height": 635  # 1600 px yükseklikte
-    },
     "hud_region": {
         "top": 40,
         "left": 1325, 
@@ -142,13 +136,6 @@ def get_scaled_default_config() -> Dict[str, Any]:
     scale_y = current_h / base_h
     
     config = copy.deepcopy(BASELINE_CONFIG)
-    
-    # OCR Bölgesini Ölçekle
-    ocr = config["ocr_region"]
-    ocr["top"] = int(ocr["top"] * scale_y)
-    ocr["left"] = int(ocr["left"] * scale_x)
-    ocr["width"] = int(ocr["width"] * scale_x)
-    ocr["height"] = int(ocr["height"] * scale_y)
     
     # HUD Bölgesini Ölçekle
     hud = config["hud_region"]

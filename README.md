@@ -18,8 +18,9 @@ Ekrandaki araç isimlerini gerçek zamanlı olarak okur ve detaylı bilgileri ov
 
 ## ✨ Özellikler
 
-- ⚡ **Hızlı OCR**: Windows OCR (30ms) veya Tesseract desteği
+- ⚡ **Akıllı OCR**: OpenCV renk maskeleme + Windows OCR (otomatik menü algılama)
 - 🎯 **Akıllı Tanıma**: TheFuzz ile bulanık eşleşme (fuzzy matching)
+- 🎮 **GTA V Enhanced Desteği**: Hem klasik hem Enhanced/BattlEye sürümleri
 - 📊 **Detaylı Bilgiler**: Fiyat, hız, sınıf, özellikler
 - 🏠 **Garaj Yönetimi**: Sahip olduğunuz araçları kaydedin
 - 🖼️ **Galeri**: 500+ araç veritabanı, filtreleme, arama
@@ -48,7 +49,7 @@ Ekrandaki araç isimlerini gerçek zamanlı olarak okur ve detaylı bilgileri ov
 
 Installer aşağıdakileri otomatik kurar:
 
-- ✅ **Tesseract OCR** (gömülü, ~60MB)
+- ✅ **Tesseract OCR** (gömülü, yedek motor)
 - ✅ **Windows OCR dil paketi** (opsiyonel, internet gerekir)
 - ✅ **Gerekli Python paketleri** (exe içine gömülü)
 - ✅ **config.json** (varsayılan ayarlar)
@@ -61,12 +62,12 @@ Installer aşağıdakileri otomatik kurar:
 
 ### Launcher (Başlatıcı)
 - **Asistanı Başlat**: Ana programı başlatır.
-- **Ayarlar**: OCR bölgesi, kısayollar ve diğer ayarlar.
+- **Ayarlar**: HUD konumu, kısayollar ve diğer ayarlar.
 - **Veri Güncelleme**: GTABase.com'dan en güncel araç verilerini çeker.
 - **Fabrika Ayarları**: Tüm ayarları varsayılana döndürür.
 
 ### Asistan (Oyun İçi)
-1. **GTA V'yi başlatın.**
+1. **GTA V'yi başlatın.** (Klasik, Enhanced veya BattlEye sürümü)
 2. **Mekanik**, **Pegasus** veya **Etkileşim Menüsü (Interaction Menu)** gibi araç listesi olan menüleri açın.
 3. Menüdeki yön tuşları veya butonlar ile araç isminin üzerine gelin.
 4. **Otomatik bilgi kartı** ekranda belirecektir.
@@ -112,7 +113,7 @@ Detaylı dokümantasyon için: [INSTALL.md](INSTALL.md)
 
 - **Windows 10/11** (64-bit)
 - **İnternet Bağlantısı** (İlk kurulum ve Windows OCR indirimi için önerilir)
-- **~300MB Disk Alanı**
+- **~150MB Disk Alanı**
 
 ## 📸 Ekran Görüntüleri
 
@@ -140,6 +141,7 @@ Bu projenin geliştirilmesinde emeği geçen herkese teşekkürler.
 - [GTABase](https://www.gtabase.com/) - Araç verileri için
 - [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) - OCR motoru için
 - [TheFuzz](https://github.com/seatgeek/thefuzz) - Bulanık eşleşme algoritması için
+- [OpenCV](https://opencv.org/) - Bilgisayarla görü tabanlı menü algılama için
 
 ---
 
@@ -153,8 +155,9 @@ Real-time vehicle name recognition via OCR, displaying detailed information via 
 
 ## ✨ Features
 
-- ⚡ **Fast OCR**: Supports Windows OCR (30ms) or Tesseract.
+- ⚡ **Smart OCR**: OpenCV color masking + Windows OCR (automatic menu detection)
 - 🎯 **Smart Recognition**: Fuzzy matching with TheFuzz for accurate detection.
+- 🎮 **GTA V Enhanced Support**: Works with Classic, Enhanced, and BattlEye editions.
 - 📊 **Detailed Info**: Price, speed, class, specifications.
 - 🏠 **Garage Management**: Track vehicles you own.
 - 🖼️ **Gallery**: Database of 500+ vehicles with filtering and search.
@@ -183,7 +186,7 @@ Real-time vehicle name recognition via OCR, displaying detailed information via 
 
 The installer automatically sets up:
 
-- ✅ **Tesseract OCR** (embedded, ~60MB)
+- ✅ **Tesseract OCR** (embedded, fallback engine)
 - ✅ **Windows OCR language pack** (optional, requires internet)
 - ✅ **Required Python packages** (embedded in exe)
 - ✅ **config.json** (default settings)
@@ -196,12 +199,12 @@ The installer automatically sets up:
 
 ### Launcher
 - **Start Assistant**: Launches the main application.
-- **Settings**: Configure OCR region, shortcuts, etc.
+- **Settings**: Configure HUD position, shortcuts, etc.
 - **Update Data**: Fetches the latest vehicle data from GTABase.com.
 - **Factory Reset**: Resets all settings to default.
 
 ### Assistant (In-Game)
-1. **Start GTA V.**
+1. **Start GTA V.** (Classic, Enhanced, or BattlEye edition)
 2. Open menus like **Mechanic**, **Pegasus**, or **Interaction Menu** where vehicle lists appear.
 3. Navigate to the vehicle name using menu buttons/keys.
 4. The **info card overlay** will appear automatically.
@@ -247,7 +250,7 @@ See docs: [INSTALL.md](INSTALL.md)
 
 - **Windows 10/11** (64-bit)
 - **Internet Connection** (Recommended for initial setup and Windows OCR)
-- **~300MB Disk Space**
+- **~150MB Disk Space**
 
 ## 📸 Screenshots
 
@@ -275,6 +278,7 @@ Thanks to everyone who contributed to the development of this project.
 - [GTABase](https://www.gtabase.com/) - For vehicle data
 - [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) - For OCR engine
 - [TheFuzz](https://github.com/seatgeek/thefuzz) - For fuzzy matching algorithm
+- [OpenCV](https://opencv.org/) - For computer vision based menu detection
 
 ---
 

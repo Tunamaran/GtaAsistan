@@ -246,38 +246,42 @@ class OcrThread(QThread):
         if not valid_candidates:
             return None
         
-        # 3. Gelişmiş Skorlama (TokenSet, TokenSort)
+        # 3. Gelişmiş Skorlama
         scored_candidates = []
         for match_text, w_score in valid_candidates:
-            # TokenSet: Kelime kümesi eşleşmesi (Marka ismi eksikse bile 100 verir)
-            # TokenSort: Kelime sıralaması ve fazlalık cezası (Tam eşleşme ayrımı için)
+            # TokenSet: Kelime kümesi alt-küme ise (örn "Vigero" içinde "Vigero ZX" yok ama tersi var)
             set_ratio = fuzz.token_set_ratio(clean_text, match_text)
+            # TokenSort: Tüm kelimeler aynı mı (Uzunluk farkını cezalandırır)
             sort_ratio = fuzz.token_sort_ratio(clean_text, match_text)
+            # Ratio: Tam bir Levenshtein mesafesi (Harfi harfine aynılık)
+            exact_ratio = fuzz.ratio(clean_text, match_text)
             
-            scored_candidates.append((match_text, w_score, set_ratio, sort_ratio))
+            scored_candidates.append((match_text, w_score, set_ratio, sort_ratio, exact_ratio))
         
-        # 4. Sıralama Stratejisi:
-        # Öncelik 1: TokenSet (Alakasız alt dizeleri eler - örn. 'Bus' vs 'Bombushka')
-        # Öncelik 2: TokenSort (Tam eşleşmeyi bulur - örn. 'Dubsta' vs 'Dubsta 6x6')
-        # Öncelik 3: WRatio (Genel benzerlik)
-        scored_candidates.sort(key=lambda x: (x[2], x[3], x[1]), reverse=True)
+        # 4. Sıralama Stratejisi (DÜZELTİLDİ):
+        # Önceki sürümde TokenSet 1. sıradaydı. Bu durum "Vigero ZX Convertible" araması yapıldığında
+        # veritabanındaki "Vigero" kelimesi ile TokenSet=100 çıkarıyordu çünkü "Vigero" kelimesi aranan metnin tam alt kümesiydi.
+        # ÇÖZÜM: Öncelik 1'e EXACT RATIO (Birebir eşleşme) veya TOKEN SORT koyuyoruz.
+        # Sıralama Önceliği: 
+        # 1. exact_ratio (Birebir eşleşmeye en yakın olan, harf sayısı tutan)
+        # 2. sort_ratio (Aynı kelimeleri içeren ama sırası karışık olan)
+        # 3. set_ratio (Eksik kelimesi olan ama alakasız olmayan)
+        scored_candidates.sort(key=lambda x: (x[4], x[3], x[2], x[1]), reverse=True)
         
         best = scored_candidates[0]
-        best_match, w_score, set_ratio, sort_ratio = best
+        best_match, w_score, set_ratio, sort_ratio, exact_ratio = best
         
         # 5. Son Karar Eşiği
-        # TokenSet oranı çok düşükse reddet (örn. 'Bus' vs 'RM-IO Bombushka' -> Set=33 -> RED)
-        # Ancak "RM-IO" vs "RM-10" -> Set=89 -> KABUL
-        # "Mansions" vs "Omnis" -> Set=62 -> RED (Eşik 85 yapıldı - Kullanıcı isteği)
-        if set_ratio < 85:
-            # print(f"[RED] {clean_text} -> {best_match} (Set: {set_ratio})")
+        # TokenSet veya Exact Ratio çok düşükse reddet
+        if set_ratio < 85 and exact_ratio < 70:
             return None
             
-        # Debug
-        # print(f"[MATCH] {clean_text} -> {best_match} (W:{w_score}, Set:{set_ratio}, Sort:{sort_ratio})")
-        
-        # Skoru WRatio olarak döndür (uyumluluk için) veya ortalama al
-        return best_match, w_score
+        # Skor olarak güvenilir bir ortalama döndür
+        final_score = (exact_ratio + sort_ratio) // 2
+        if final_score < 50:
+            final_score = w_score # Fallback
+            
+        return best_match, final_score
 
     # =====================================================
     # Windows OCR modu: Tüm ekran taraması (kontur yok)
@@ -349,20 +353,24 @@ class OcrThread(QThread):
             return True  # Hata durumunda devam et
 
     def _run_winocr_loop(self) -> None:
-        """Windows OCR döngüsü: Tüm ekranı tarar, EN PARLAK (seçili) satırı bulur."""
+        """Windows OCR döngüsü: Yalnızca menüdeki seçili (Highlight) satırı bulur ve okur."""
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         
-        monitor = cfg.get("ocr_region", {"top": 0, "left": 0, "width": 500, "height": 800})
-        last_matched = ""
-        last_seen = time.time()
-        
-        self.no_vehicle_counter = 0
-
-        with mss.mss() as sct:  # Context manager
+        # Ana monitör boyutunu alıp sol kısmı (örneğin %35 genişlik) tam yükseklikle tarayacağız
+        with mss.mss() as sct:
+            monitor = sct.monitors[1]  # Birincil monitör
+            # Monitor alanı: {left, top, width, height}
+            scan_rect = {
+                "top": monitor["top"],
+                "left": monitor["left"],
+                "width": min(600, int(monitor["width"] * 0.35)),  # Maksimum 600px veya ekranın %35'i
+                "height": monitor["height"]
+            }
+            
             try:
                 while self.running:
-                    # Önce pencere kontrolü
+                    # 1. GTA Pencere Kontrolü
                     is_gta = self._is_gta_active()
                     if is_gta != self.last_gta_state:
                         self.last_gta_state = is_gta
@@ -374,121 +382,135 @@ class OcrThread(QThread):
                         time.sleep(1)
                         continue
 
-                    # Duraklatma kontrolü
+                    # 2. Duraklatma Kontrolü
                     if self.paused:
                         self.hide_hud_signal.emit()
                         time.sleep(1)
                         continue
 
                     try:
-                        # 1. Ekranı yakala
-                        screen_grab = np.array(sct.grab(monitor))
-                        gray = cv2.cvtColor(screen_grab, cv2.COLOR_BGRA2GRAY)
-                        # İYİLEŞTİRME: Resmi 2x büyüt (Küçük metinleri okumak için - örn. Dubsta 6x6)
-                        h_orig, w_orig = gray.shape
-                        gray_2x = cv2.resize(gray, (w_orig*2, h_orig*2), interpolation=cv2.INTER_LINEAR)
+                        # 3. Ekranı Yakala
+                        screen_grab = np.array(sct.grab(scan_rect))
+                        # BGR formattan HSV formata çevir (Renk maskelemesi HSV'de çok daha stabildir)
+                        hsv = cv2.cvtColor(screen_grab, cv2.COLOR_BGRA2BGR)
+                        hsv = cv2.cvtColor(hsv, cv2.COLOR_BGR2HSV)
                         
-                        # 2. Windows OCR ile tüm satırları oku (Büyütülmüş resim ile)
-                        # 2. Windows OCR ile tüm satırları oku (Büyütülmüş resim ile)
-                        lines = self._run_winocr(gray_2x)
-                        logging.debug(f"[DEBUG] Bulunan satır sayısı: {len(lines)}")
+                        # 4. Seçili Şeridin (Highlight) Rengini Maskele
+                        # GTA V menüsündeki seçili satır genellikle çok açık gri/beyazdır.
+                        # HSV değerleri: Hue(0-180), Saturation(0-255), Value(0-255)
+                        # Düşük doygunluk (Saturation < 40) ve yüksek parlaklık (Value > 200) olan pikselleri arıyoruz.
+                        lower_white = np.array([0, 0, 200])
+                        upper_white = np.array([180, 40, 255])
                         
-                        candidates = []  # (araç_ismi, skor, parlaklık, ham_metin)
+                        mask = cv2.inRange(hsv, lower_white, upper_white)
                         
-                        for line_idx, line in enumerate(lines):
-                            raw_text = line.text.strip()
-                            if raw_text:
-                                logging.debug(f"[DEBUG] Satır {line_idx}: '{raw_text}'")
+                        # 5. Maskedeki Şekilleri (Contours) Bul
+                        # Küçük gürültüleri gidermek için morfolojik işlem yapalım
+                        kernel = np.ones((1, 5), np.uint8) 
+                        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+                        
+                        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        
+                        highlight_rect = None
+                        max_w = 0
+                        
+                        # 6. Bulunan şekillerden "Menü Şeridi" olmaya en uygununu seç
+                        for cnt in contours:
+                            x, y, w, h = cv2.boundingRect(cnt)
                             
-                            # 3. Temizle
-                            clean = self._clean_text(raw_text)
-                            if not clean:
-                                logging.debug(f"[DEBUG] Temizleme sonrası boş: '{raw_text}'")
-                                continue
+                            # Menü şeridi yatayda uzun (örn 200-400px), dikeyde incedir.
+                            # Garaj ve liste elemanlarında çift satırlı isimler olabildiği için yüksekliği 120'ye kadar esnetiyoruz.
+                            # Ayrıca sol kenara yakın olmalıdır (x çok büyük olamaz)
+                            if w > 150 and w < 440 and h > 20 and h < 120 and x < 50:
+                                # En geniş olanı (gerçek şeridi) alıyoruz (Bazen ufak menü parçaları kopuk olabilir)
+                                if w > max_w:
+                                    max_w = w
+                                    highlight_rect = (x, y, w, h)
+                                    
+                        # 7. Sadece Şeridi Kırp ve OCR'a Gönder
+                        candidates = []
+                        if highlight_rect:
+                            x, y, w, h = highlight_rect
                             
-                            logging.debug(f"[DEBUG] Temiz metin: '{clean}'")
+                            # Güvenlik için şeridi biraz daraltalım/genişletelim ki yazıyı tam alsın
+                            y_start = max(0, y - 2)
+                            y_end = min(screen_grab.shape[0], y + h + 2)
                             
-                            # 4. Eşleştir
-                            match_result = self._match_vehicle(clean)
-                            if match_result:
-                                match, score = match_result
+                            # Etkileşim (Interaction) menüsünde araç isimleri sağa dayalıdır (Örn: < Havok >).
+                            # Bu yüzden barın "solundaki" ikonları vs. kırparken sağ tarafını tam uzunlukta bırakmalıyız.
+                            x_start = max(0, x + 5) 
+                            
+                            # X_end'i tam genişlikte (veya sonuna kadar) alıyoruz ki Interaction menüsündeki sağa dayalı araç isimleri kesilmesin.
+                            x_end = min(screen_grab.shape[1], x + w)
+                            
+                            roi_color = screen_grab[y_start:y_end, x_start:x_end]
+                            roi_gray = cv2.cvtColor(roi_color, cv2.COLOR_BGRA2GRAY)
+                            
+                            # Seçili şeritte arka plan BEYAZ, metin SİYAHtır.
+                            # OCR daha iyi okusun diye resmi Invert (Ters Çevirme) yapıyoruz: Siyah arkaplan, beyaz metin.
+                            _, roi_binary = cv2.threshold(roi_gray, 180, 255, cv2.THRESH_BINARY_INV)
+                            
+                            # Metni okumayı kolaylaştırmak için 2 kat büyüt
+                            roi_2x = cv2.resize(roi_binary, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+                            
+                            # OCR işlemini başlat (Sadece 50x300 piksellik bir alanı okuyor!)
+                            lines = self._run_winocr(roi_2x)
+                            
+                            for line in lines:
+                                raw_text = line.text.strip()
+                                # print(f"[TARGETED OCR] Ham Metin: '{raw_text}'")
                                 
-                                # 5. Parlaklık Hesapla (Highlight tespiti için)
-                                # Koordinatlar 2x büyütülmüş resme göredir
-                                words = list(line.words)
-                                if words:
-                                    w_first = words[0].bounding_rect
-                                    w_last = words[-1].bounding_rect
-                                    
-                                    x = int(w_first.x)
-                                    y = int(w_first.y)
-                                    w = int(w_last.x + w_last.width - w_first.x)
-                                    h = int(max(w_first.height, w_last.height))
-                                    
-                                    # Güvenlik kontrolü (gray_2x boyutlarına göre)
-                                    y1 = max(0, y)
-                                    y2 = min(gray_2x.shape[0], y + h)
-                                    x1 = max(0, x)
-                                    x2 = min(gray_2x.shape[1], x + w)
-                                    
-                                    if x2 > x1 and y2 > y1:
-                                        # HEURISTIC: Oyun içi çevre metinlerini engelleme
-                                        # Menüler sola hizalıdır. x_start (2x resimde) çok sağdaysa reddet. (Max 450px)
-                                        # Yükseklik çok büyükse (dev tabela vb) reddet. (Max 120px)
-                                        if x < 450 and h < 120:
-                                            roi = gray_2x[y1:y2, x1:x2]
-                                            brightness = float(np.mean(roi))
-                                            candidates.append((match, score, brightness, clean))
-                                        else:
-                                            logging.debug(f"[DEBUG] Çevre Yazısı Reddedildi: '{clean}' (X={x}, H={h})")
-                        
-                        # 6. En parlak (highlight olan) adayı seç
-                        # YENİ: Sadece parlak (seçili) öğeleri dikkate al (Başlıkları ve seçili olmayanları eler)
-                        logging.debug(f"[DEBUG] Adaylar (Filtre Öncesi): {[(c[3], int(c[2])) for c in candidates]}")
-                        candidates = [c for c in candidates if c[2] >= 100]
-                        if not candidates:
-                             logging.debug("[DEBUG] Parlaklık filtresinden geçen aday yok.")
-                        
+                                clean = self._clean_text(raw_text)
+                                if clean:
+                                    match_result = self._match_vehicle(clean)
+                                    if match_result:
+                                        match, score = match_result
+                                        candidates.append((match, score, clean))
+                                        
+                        # 8. Sonuç Değerlendirmesi
                         if candidates:
-                            # Parlaklığa göre sırala (en yüksek en başa)
-                            candidates.sort(key=lambda x: x[2], reverse=True)
-                            
-                            best_match, best_score, best_br, best_clean = candidates[0]
-                            
-                            # Debug
-                            # print(f"[OCR] Adaylar: {[(c[3], int(c[2])) for c in candidates]}")
+                            # Sadece 1 satır/araç olmasını bekliyoruz zaten, ilkini alabiliriz.
+                            best_match, best_score, best_clean = candidates[0]
                             
                             detected = True
                             last_seen = time.time()
                             
                             if best_match != last_matched:
                                 last_matched = best_match
-                                print(f"[OCR SEÇİLDİ] {best_clean} -> {best_match} (Skor: {best_score}, Parlaklık: {best_br:.1f})")
+                                logging.debug(f"[OCR SEÇİLDİ] {best_clean} -> {best_match} (Skor: {best_score})")
                                 self.vehicle_found_signal.emit(self.search_dict[best_match])
                         
-                        # Araç kaybolursa HUD'ı gizle
-                        if not candidates and last_matched != "" and (time.time() - last_seen > self.HUD_TIMEOUT):
-                            self.hide_hud_signal.emit()
-                            last_matched = ""
+                        else:
+                            # Araç kaybolursa zaman aşımından sonra HUD'ı gizle
+                            if last_matched != "" and (time.time() - last_seen > self.HUD_TIMEOUT):
+                                self.hide_hud_signal.emit()
+                                last_matched = ""
                     
-                    except Exception:
-                        logging.exception("[OcrThread:winocr] OCR döngüsü hatası")
+                    except Exception as e:
+                        logging.exception(f"[OcrThread:winocr] OCR döngüsü hatası: {e}")
                         self.hide_hud_signal.emit()
                         last_matched = ""
                         time.sleep(1.0)
 
-                    time.sleep(0.25)
+                    time.sleep(0.25) # İstediğiniz hızda okuması için döngü beklemesi
             finally:
                 if self._loop:
                     self._loop.close()
 
     def _run_tesseract_loop(self) -> None:
         """Tesseract döngüsü: Kontur tabanlı, ROI bazlı OCR."""
-        monitor = cfg.get("ocr_region", {"top": 0, "left": 0, "width": 500, "height": 800})
         last_matched = ""
         last_seen = time.time()
 
         with mss.mss() as sct:  # Context manager
+            monitor = sct.monitors[1]
+            scan_rect = {
+                "top": monitor["top"],
+                "left": monitor["left"],
+                "width": min(600, int(monitor["width"] * 0.35)),
+                "height": monitor["height"]
+            }
+            
             try:
                 while self.running:
                     # Pencere Kontrolü (Tesseract Modu İçin Ekledim)
@@ -508,7 +530,7 @@ class OcrThread(QThread):
                         continue
 
                     try:
-                        screen_grab = np.array(sct.grab(monitor))
+                        screen_grab = np.array(sct.grab(scan_rect))
                         gray = cv2.cvtColor(screen_grab, cv2.COLOR_BGRA2GRAY)
                         
                         _, mask = cv2.threshold(gray, 140, 255, cv2.THRESH_BINARY)
